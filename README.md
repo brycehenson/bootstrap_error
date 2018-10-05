@@ -1,6 +1,10 @@
 # boostrap_error
 use bootstaping to find the standard error in an arbitrary analysis apperation
 
+# Details
+- Finite sample correction from [L. Isserlis,On the Value of a Mean as Calculated from a Sample,J. Royal Stat. Soc
+Vol. 81, No. 1 (Jan., 1918), pp. 75-81](http://doi.org/10.2307/2340569)
+
 ![fig1](/fig1.png)
 
 ## To Do
