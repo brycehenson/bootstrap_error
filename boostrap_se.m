@@ -10,6 +10,9 @@ addOptional(p,'num_samp_rep',10,@(x) isnumeric(x) & x>=1);
 addOptional(p,'samp_frac_lims',[1e-3,1],is_lims);
 addOptional(p,'plots',false,@logicalable);
 addOptional(p,'plot_fig_num',10,@(x) isnumeric(x) & x>=1);
+%optional arguments for diagnostic/test plots
+addOptional(p,'true_dist_se',nan,@(x) isnumeric(x) & x>0);
+addOptional(p,'true_samp_se',nan,@(x) isnumeric(x) & x>0);
 parse(p,varargin{:});
 
 do_plots=coerce_logical(p.Results.plots);
@@ -31,7 +34,7 @@ for ii=1:numel(sample_frac_vec)
     %the finte sample correaction for the no replacements method breaks when n_sample=ntot
     if n_sample>3 && (n_sample<n_total || do_replace)
         %the scaling of std(std(x)) is 1/n so lets take more data at smaller sample_frac
-        repeat_samp_scaled=round(repeat_samp_prefactor*1/sample_frac);
+        repeat_samp_scaled=round(repeat_samp_prefactor); %*1/sample_frac
         anal_sample=NaN(repeat_samp_scaled,1);
         if do_replace
             for jj=1:repeat_samp_scaled
@@ -63,14 +66,26 @@ if do_plots
     figure(p.Results.plot_fig_num);
     clf
     set(gcf,'color','w')
-    plot(stats.opp_frac_est_se(:,1),stats.opp_frac_est_se(:,2),'ko-');
+    plot(stats.opp_frac_est_se(:,1),stats.opp_frac_est_se(:,2),'ko',...
+    'MarkerSize',6,...
+    'MarkerEdgeColor','k',...
+    'MarkerFaceColor',[1,1,1]*0.2)
     hold on
     xl=xlim(gca);
     line(xl,[1,1]*stats.se_opp,'Color','k','LineWidth',2)
     line(xl,[1,1]*(stats.se_opp-stats.std_se_opp),'Color','m','LineWidth',2)
     line(xl,[1,1]*(stats.se_opp+stats.std_se_opp),'Color','m','LineWidth',2)
+    legends={'Est SE','mean Est SE','+std Est SE','-std Est SE'};
+    if ~isnan(p.Results.true_dist_se)
+        legends=[legends,'true dist SE'];
+        line(xl,[1,1]*p.Results.true_dist_se,'Color','r','LineWidth',2)
+    end
+    if ~isnan(p.Results.true_samp_se)
+        legends=[legends,'true Samp SE'];
+        line(xl,[1,1]*p.Results.true_samp_se,'Color','b','LineWidth',2)
+    end
     hold off
-    legend('Est SE','mean Est SE','±std Est SE')
+    legend(legends)
     xlabel('fraction of whole data set')
     ylabel('est. SE in opp on whole data set')
     

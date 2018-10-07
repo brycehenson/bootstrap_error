@@ -21,21 +21,22 @@
 %repeatability
 %rng(round(pi*exp(1)*1e3));
 
-%normal data operation=mean
-% data= normrnd(0,1,[1e2,1]);
-% anal_opp=@(x) mean(x);
 % %for simple things tell us what the actual stadnard error in the mean is
-% real_ste=1/sqrt(numel(data));
+
+%normal data operation=mean
+data= normrnd(0,1,[1e3,1]);
+anal_opp=@(x) mean(x);
+real_ste=1/sqrt(numel(data));
 
 %unit interval uniform
-data=rand([1e2,1]);
-anal_opp=@(x) mean(x);
-real_ste=sqrt((1/12))/sqrt(numel(data));
+%data=rand([1e2,1]);
+%anal_opp=@(x) mean(x);
+%real_ste=sqrt((1/12))/sqrt(numel(data));
 
 
-sample_ste=std(data,1)/sqrt(numel(data)-1);
-sample_frac_vec=linspace(1e-2,1,10);
-repeat_samp_prefactor=1e1;
+sample_ste=std(data,1)/sqrt(numel(data));
+sample_frac_vec=linspace(1e-2,1,60);
+repeat_samp_prefactor=1e2;
 unc_frac=NaN(numel(sample_frac_vec),2);
 unc_pop=NaN(size(sample_frac_vec));
 n_total=numel(data);
@@ -56,11 +57,20 @@ for ii=1:numel(sample_frac_vec)
         %estimape the pop std for with replacements
         unc_frac(ii,1)=std(anal_sample_with_rep)*sqrt(n_sample);
         finite_pop_corr=sqrt((n_total-n_sample)/(n_total-1));
-        unc_frac(ii,2)=std(anal_sample_no_rep)*sqrt(n_sample)/finite_pop_corr;
+        %this does not work well at subset fractions aproaching 1
+        if finite_pop_corr>1e-4 
+            unc_frac(ii,2)=std(anal_sample_no_rep)*sqrt(n_sample)/finite_pop_corr;
+        end
     end
     fprintf('\b\b%02u',ii);
 end
 fprintf('..Done\n')
+est_anal_unc=[];
+mean_est_anal_unc=[];
+est_anal_unc(:,1)=unc_frac(:,1)/sqrt(numel(data));
+mean_est_anal_unc(1)=nanmean(est_anal_unc(:,1));
+est_anal_unc(:,2)=unc_frac(:,2)/sqrt(numel(data));
+mean_est_anal_unc(2)=nanmean(est_anal_unc(:,2));
 
 %%
 
@@ -68,19 +78,18 @@ fprintf('..Done\n')
 
 figure(1);
 clf
-est_anal_unc(:,1)=unc_frac(:,1)/sqrt(numel(data));
-mean_est_anal_unc(1)=nanmean(est_anal_unc(:,1));
-est_anal_unc(:,2)=unc_frac(:,2)/sqrt(numel(data));
-mean_est_anal_unc(2)=nanmean(est_anal_unc(:,2));
-plot(sample_frac_vec,est_anal_unc(:,1));
+
+plot(sample_frac_vec,est_anal_unc(:,1),'r');
 hold on
-plot(sample_frac_vec,est_anal_unc(:,2));
+plot(sample_frac_vec,est_anal_unc(:,2),'b');
 xl=xlim(gca);
-line(xl,[real_ste,real_ste],'Color','k','LineWidth',2)
-line(xl,[sample_ste,sample_ste],'Color','m','LineWidth',2)
+line(xl,[1,1]*nanmean(est_anal_unc(:,1)),'Color','r','LineWidth',2)
+line(xl,[1,1]*nanmean(est_anal_unc(:,2)),'Color','b','LineWidth',2)
+line(xl,[1,1]*real_ste,'Color','k','LineWidth',2)
+line(xl,[1,1]*sample_ste,'Color','m','LineWidth',2)
 
 hold off
-legend('with replacement','without replacement','mean SE')
+legend('with replacement','without replacement','rep avg','no rep avg','dist SE','data sample SE')
 xlabel('frac data')
 ylabel('std subset * sqrt(n)')
 
@@ -89,13 +98,19 @@ ylabel('std subset * sqrt(n)')
 fignum=10;
 data=normrnd(0,1,[1e4,1]);
 anal_opp=@(x) mean(x);
-stats=boostrap_se(anal_opp,data,'plots',true,'replace',true,'num_samp_frac',1e2,...
-    'samp_frac_lims',[0.1,0.9],'num_samp_rep',100,'plot_fig_num',fignum)
-real_ste=1/sqrt(numel(data));
-(real_ste-stats.se_opp)/real_ste
-real_ste-stats.se_opp/stats.se_se_opp
+real_dist_ste=1/sqrt(numel(data));
+real_samp_se=std(data,1)/sqrt(numel(data));
 
-figure(fignum)
-xl=xlim(gca);
-line(xl,[1,1]*real_ste,'Color','g','LineWidth',2)
+boot=boostrap_se(anal_opp,data,...
+    'plots',true,...
+    'replace',true,...
+    'samp_frac_lims',[0.005,0.8],...
+    'num_samp_frac',1e3,...
+    'num_samp_rep',1e1,...
+    'plot_fig_num',fignum,...
+    'true_dist_se',real_dist_ste,...
+    'true_samp_se',real_samp_se)
 
+
+(real_dist_ste-boot.se_opp)/real_dist_ste
+(real_dist_ste-boot.se_opp)/boot.se_se_opp
