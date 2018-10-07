@@ -2,8 +2,14 @@ function [stats,outs]=boostrap_se(anal_opp,data,varargin)
 %funciton calculates the standard error of performing anal_opp(data)
 %data is a vector of cells or scalars
 
-%note the moment based error estimate will be downwards biased if
-%num_samp_frac is too small
+% Known BUGS/ Possible Improvements
+%   -make a function that integerates all this into something that can be easily wrapped arround a
+%   dataset
+% Author: Bryce Henson
+% email: Bryce.Henson[the a swirly]live.com you must have
+% '[matlab][boostrap_error]' in the subject line for me to respond
+% Last revision:2018-10-08
+
 
 p = inputParser;
 is_lims=@(x) isequal(size(x),[1,2]) & isnumeric([1,1]) & x(2)<=1 & x(1)>1e-4;
@@ -16,7 +22,7 @@ addOptional(p,'plot_fig_num',10,@(x) isnumeric(x) & x>=1);
 %optional arguments for diagnostic/test plots
 addOptional(p,'true_dist_se',nan,@(x) isnumeric(x) & x>0);
 addOptional(p,'true_samp_se',nan,@(x) isnumeric(x) & x>0);
-addOptional(p,'mean_se_for_se_se',nan,@logicalable);
+addOptional(p,'mean_se_for_se_se',false,@logicalable);
 parse(p,varargin{:});
 
 do_plots=coerce_logical(p.Results.plots);
@@ -83,13 +89,13 @@ if use_mean_se_for_se_se
 else
     est_var=abs(moments_sub(:,1));
 end
-est_var_std_opp=(1./sample_num_vec).*...
+est_var_std_opp=((1./sample_num_vec).*...
         sqrt(...
             moments_sub(:,3)-...
             ((sample_num_vec-3)./(sample_num_vec-1)).*(moments_sub(:,1).^2)...
             )...
-        -2.*est_var;
-est_std_std_opp=sqrt(abs(est_var_std_opp))./sqrt(n_total) ; %sqrt(sample_num_vec)
+        -2.*est_var);
+est_std_std_opp=sqrt(abs(est_var_std_opp))./sqrt(sample_num_vec-1);
 
 
 
@@ -101,15 +107,16 @@ stats.se_opp_unweighted=nanmean(stats.opp_frac_est_se(:,2));
 stats.se_opp=nansum(stats.opp_frac_est_se(:,2)...
                 ./(stats.opp_frac_est_se(:,3).^2))./...
             nansum(1./(stats.opp_frac_est_se(:,3).^2));
-stats.se_se_opp=sqrt(1./sum(1./(stats.opp_frac_est_se(:,3).^2)));
+stats.se_se_opp=sqrt(1./sum((stats.opp_frac_est_se(:,3).^-2)));
 stats.std_se_opp=stats.se_se_opp.*sqrt(sum(~isnan(stats.opp_frac_est_se(:,2))));
 
 stats.std_se_opp_unweighted=nanstd(stats.opp_frac_est_se(:,2));
-stats.se_se_opp_unweighted=stats.std_se_opp/sqrt(sum(~isnan(stats.opp_frac_est_se(:,2))));
+stats.se_se_opp_unweighted=stats.std_se_opp_unweighted...
+    /sqrt(sum(~isnan(stats.opp_frac_est_se(:,2))));
 
 fprintf('..Done\n')
 if do_plots
-    figure(p.Results.plot_fig_num);
+    sfigure(p.Results.plot_fig_num);
     clf
     set(gcf,'color','w')
     errorbar(stats.opp_frac_est_se(:,1),stats.opp_frac_est_se(:,2),...
