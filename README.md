@@ -46,6 +46,7 @@ Vol. 81, No. 1 (Jan., 1918), pp. 75-81](http://doi.org/10.2307/2340569)
 contributors welcome! There is a lot to do to build this into a powerful tool. Drop me an email. 
 - build convergence test for some distributions (normal,uniform,(arb. kurtosis)[https://en.wikipedia.org/wiki/Kurtosis#The_Pearson_type_VII_family]
 - check estimated SE of the SE estimate by nesting the boostraper
+- fix the overestimation of error at small fractions of the dataset
 - more Documentation
   - commenting in main function with links
   - organizing the resources in this readme
