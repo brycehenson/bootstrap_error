@@ -1,5 +1,11 @@
 # boostrap_error
-use bootstaping to find the standard error in an arbitrary analysis operation
+A matlab function that uses bootstaping to find the standard error in an arbitrary analysis operation.
+
+It only takes a moderate amount of complexity in data analysis before it is difficult to determine the error in the result. Boostraping is a powerfull statistical method that performs the analysis repeatedly on smaller subsets of the data in order to *estimate* the error in the final result (using all the data).
+
+**[TO BE CHECKED]** The standard error estimate of the bootraping procedure is reasonably robust against non gaussian distributions and can be used to detect them. 
+
+The procedure is this
 
 # Details
 - Finite sample correction from [L. Isserlis,On the Value of a Mean as Calculated from a Sample,J. Royal Stat. Soc
