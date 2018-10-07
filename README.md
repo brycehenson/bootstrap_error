@@ -16,20 +16,22 @@ The procedure is reasonably simple given some analysis operation A(x) where x is
 4. calulate the standard deviation across these results and multiply by sqrt(n_samp)/sqrt(n_tot) to estimate the standard error in A(D).
 
 
-The above uses random sampling with replacement in order to prevent biasing of the standrd error estimate. It is however possible to use the Finite sample correction from [L. Isserlis,On the Value of a Mean as Calculated from a Sample,J. Royal Stat. Soc
+The above uses random sampling with replacement in order to prevent biasing of the standard error estimate. It is however possible to use the Finite sample correction from [L. Isserlis,On the Value of a Mean as Calculated from a Sample,J. Royal Stat. Soc
 Vol. 81, No. 1 (Jan., 1918), pp. 75-81](http://doi.org/10.2307/2340569) to correct for the bias when using random sampling without replacements. Both methods are implemented in this work.
 
 
 As a test it is advisable to check that there is no trend in the estimated standard error as function of the size of the subsample. Thus the above procedure is repeated at many different fractions of the whole dataset. 
+## Error in the estimated error
+- Error in the SE estimate [dist. of sample var.](https://en.wikipedia.org/wiki/Variance#Distribution_of_the_sample_variance) and [centeral moments](https://en.wikipedia.org/wiki/Central_moment)
+-see derivation folder
 
-
-# Details
+## Details
 - Finite sample correction from [L. Isserlis,On the Value of a Mean as Calculated from a Sample,J. Royal Stat. Soc
 Vol. 81, No. 1 (Jan., 1918), pp. 75-81](http://doi.org/10.2307/2340569)
 
 ![fig1](/fig1.png)
 
-# Further Reading
+## Further Reading
 - [wiki](https://en.wikipedia.org/wiki/Bootstrapping_(statistics))
 - [pi bootstrapped](https://pypi.org/project/bootstrapped/)
 - [Jason Brownlee,A gentler introduction to the bootstrap method](https://machinelearningmastery.com/a-gentle-introduction-to-the-bootstrap-method/)
@@ -39,13 +41,19 @@ Vol. 81, No. 1 (Jan., 1918), pp. 75-81](http://doi.org/10.2307/2340569)
 
 
 ## To Do
-- Error in the SE estimate [dist. of sample var.](https://en.wikipedia.org/wiki/Variance#Distribution_of_the_sample_variance) and [centeral moments](https://en.wikipedia.org/wiki/Central_moment)
-- Documentation
+contributors welcome! There is a lot to do to build this into a powerful tool. Drop me an email. 
+- build convergence test for some distributions (normal,uniform,(arb. kurtosis)[https://en.wikipedia.org/wiki/Kurtosis#The_Pearson_type_VII_family]
+- check estimated SE of the SE estimate by nesting the boostraper
+- more Documentation
+  - commenting in main function with links
+  - organizing the resources in this readme
 - allow second output from anal_opp function (to be used as a structure of details about the fit)
   - allow for this second output not to be provided
-- provide all these second outputs in a cell matrix
-- test for sub datasets
-- test biasing for non gaussian distribution
-- write out as tutorial
+  - provide all these second outputs in a cell matrix
+- write tutorial in more detail
 - normalily testing
+  - during the bootstrap try and determine if the underlying distribution is normal or not
+  - (package)[https://au.mathworks.com/matlabcentral/fileexchange/60147-normality-test-package]
+
+
 
