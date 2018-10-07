@@ -64,10 +64,16 @@ for ii=1:numel(sample_frac_vec)
             for jj=1:repeat_samp(ii)
                 anal_opp_sub(jj)=anal_opp(randsample(data,n_sample));
             end
+             %setimate the population std
+            % biased sample variance of the subset
+            moments_sub(ii,1)=moment(anal_opp_sub,2);
+            moments_sub(ii,2)=moment(anal_opp_sub,3);
+            moments_sub(ii,3)=moment(anal_opp_sub,4);
+            
             %use finte population correction to estimate the population std using sampling without
             %replacements
-            finite_pop_corr=sqrt((n_total-n_sample)/(n_total-1));
-            moments_sub(ii)=std(anal_opp_sub)*sqrt(n_sample)/finite_pop_corr;
+            finite_pop_corr=(n_total-n_sample)/(n_total-1);
+            moments_sub(ii,1)=moments_sub(ii,1)/finite_pop_corr;
         end
     end
     fprintf('\b\b\b%03u',ii);
