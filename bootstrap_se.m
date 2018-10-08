@@ -1,4 +1,4 @@
-function [stats,outs]=boostrap_se(anal_opp,data,varargin)
+function [stats,outs]=bootstrap_se(anal_opp,data,varargin)
 %funciton calculates the standard error of performing anal_opp(data)
 %data is a vector of cells or scalars
 
@@ -7,7 +7,7 @@ function [stats,outs]=boostrap_se(anal_opp,data,varargin)
 %   dataset
 % Author: Bryce Henson
 % email: Bryce.Henson[the a swirly]live.com you must have
-% '[matlab][boostrap_error]' in the subject line for me to respond
+% '[matlab][bootstrap_error]' in the subject line for me to respond
 % Last revision:2018-10-08
 
 
