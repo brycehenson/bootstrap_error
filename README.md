@@ -1,5 +1,5 @@
 # bootstrap_error
-**Bryce Henson, Dong K. Shin** 
+**Bryce M. Henson, Dong K. Shin**  
 Matlab code for fast masking/selection of ordered vectors based on binary search.
 A matlab function that uses bootstrapping to find the standard error in an arbitrary analysis operation.
 
