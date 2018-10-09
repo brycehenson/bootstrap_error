@@ -1,10 +1,12 @@
-function [stats,outs]=bootstrap_se(anal_opp,data,varargin)
+
+function [stats,detailed_data_out]=boostrap_se(anal_opp,data,varargin)
 %funciton calculates the standard error of performing anal_opp(data)
 %data is a vector of cells or scalars
 
+%anal_opp is a function that takes a vector or a cell matrix and retuns a scalar as the first outputs
+%this code can store an arbitraty number of function outputs in a cell array and return them for use
 % Known BUGS/ Possible Improvements
-%   -make a function that integerates all this into something that can be easily wrapped arround a
-%   dataset
+%   -handle arbitrary number of scalars (as a vector or matrix) for simulanious multi paramerter boostraping
 % Author: Bryce Henson
 % email: Bryce.Henson[the a swirly]live.com you must have
 % '[matlab][bootstrap_error]' in the subject line for me to respond
@@ -23,14 +25,18 @@ addOptional(p,'plot_fig_num',10,@(x) isnumeric(x) & x>=1);
 addOptional(p,'true_dist_se',nan,@(x) isnumeric(x) & x>0);
 addOptional(p,'true_samp_se',nan,@(x) isnumeric(x) & x>0);
 addOptional(p,'mean_se_for_se_se',false,@logicalable);
+addOptional(p,'save_multi_out',false,@logicalable);
+addOptional(p,'save_input_data',false,@logicalable);
+
 parse(p,varargin{:});
 
 do_plots=coerce_logical(p.Results.plots);
 do_replace=coerce_logical(p.Results.replace);
 use_mean_se_for_se_se=coerce_logical(p.Results.mean_se_for_se_se);
+save_multi_out=coerce_logical(p.Results.save_multi_out);
+save_input_data=coerce_logical(p.Results.save_input_data);
 
 %input taken care of
-
 sample_frac_vec=linspace(p.Results.samp_frac_lims(1),...
     p.Results.samp_frac_lims(2),p.Results.num_samp_frac)';
 repeat_samp_prefactor=p.Results.num_samp_rep;
@@ -40,41 +46,55 @@ repeat_samp=NaN(numel(sample_frac_vec),1);
 n_total=numel(data);
 sample_num_vec=floor(sample_frac_vec*n_total);
 sample_frac_vec=sample_num_vec/n_total;
+iimax=numel(sample_frac_vec);
+
+%find the size of the output
+output_size=nargout(anal_opp);
+out_cell=cell(iimax,repeat_samp_prefactor);
+in_cell=out_cell;
+out_cell_tmp=cell(1,output_size);
+if output_size>1 && save_multi_out
+    multi_out=true;
+else
+    multi_out=false;
+end
+
 
 fprintf('Bootstaping with different sample fractions %03u:%03u',0)
-for ii=1:numel(sample_frac_vec)
+for ii=1:iimax
     n_sample=sample_num_vec(ii);
     %std means nothing for n<3
     %the finte sample correaction for the no replacements method breaks when n_sample=ntot
     if n_sample>3 && (n_sample<n_total || do_replace)
-        %the scaling of std(std(x)) is 1/n so lets take more data at smaller sample_frac
+        %this is alowed to vary
         repeat_samp(ii)=round(repeat_samp_prefactor); %*1/sample_frac
         anal_opp_sub=NaN(repeat_samp(ii),1);
         if do_replace
-            for jj=1:repeat_samp(ii)
-                %calculate the analysis operation on the subset of dat
-                anal_opp_sub(jj)=anal_opp(randsample(data,n_sample,true));
-            end
-            %setimate the population std
-            % biased sample variance of the subset
-            moments_sub(ii,1)=moment(anal_opp_sub,2);
-            moments_sub(ii,2)=moment(anal_opp_sub,3);
-            moments_sub(ii,3)=moment(anal_opp_sub,4);
+            finite_pop_corr=1;
         else
-            for jj=1:repeat_samp(ii)
-                anal_opp_sub(jj)=anal_opp(randsample(data,n_sample));
-            end
-             %setimate the population std
-            % biased sample variance of the subset
-            moments_sub(ii,1)=moment(anal_opp_sub,2);
-            moments_sub(ii,2)=moment(anal_opp_sub,3);
-            moments_sub(ii,3)=moment(anal_opp_sub,4);
-            
-            %use finte population correction to estimate the population std using sampling without
-            %replacements
             finite_pop_corr=(n_total-n_sample)/(n_total-1);
-            moments_sub(ii,1)=moments_sub(ii,1)/finite_pop_corr;
+        end 
+        for jj=1:repeat_samp(ii)
+            %calculate the analysis operation on the subset of dat
+            data_smpl=randsample(data,n_sample,do_replace);
+            [out_cell_tmp{:}]=anal_opp(data_smpl);
+            anal_opp_sub(jj)=out_cell_tmp{1};
+            if multi_out
+                out_cell{ii,jj}=out_cell_tmp{2:end};
+            end
+            if save_input_data
+                in_cell{ii,jj}=data_smpl;
+            end
         end
+        %setimate the population std
+        % biased sample variance of the subset
+        moments_sub(ii,1)=moment(anal_opp_sub,2);
+        moments_sub(ii,2)=moment(anal_opp_sub,3);
+        moments_sub(ii,3)=moment(anal_opp_sub,4);
+
+        %use finte population correction to estimate the population std using sampling without
+        %replacements, if do_replace finite_pop_corr=1
+        moments_sub(ii,1)=moments_sub(ii,1)/finite_pop_corr;
     end
     fprintf('\b\b\b%03u',ii);
 end
@@ -154,6 +174,9 @@ if do_plots
     %hist(abs((boot.se_opp-boot.opp_frac_est_se(:,2))./boot.opp_frac_est_se(:,3)),1e2)
 end
 
+detailed_data_out=[];
+if save_multi_out, detailed_data_out.out_cell=out_cell; end
+if save_input_data, detailed_data_out.in_cell=in_cell; end
 
 %
 end
