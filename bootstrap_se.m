@@ -1,4 +1,8 @@
+<<<<<<< HEAD:boostrap_se.m
 function [stats,detailed_data_out]=boostrap_se(anal_opp,data,varargin)
+=======
+function [stats,outs]=bootstrap_se(anal_opp,data,varargin)
+>>>>>>> 8bc4f0be55c7a685527e416cd9a6c06ebcd3551b:bootstrap_se.m
 %funciton calculates the standard error of performing anal_opp(data)
 %data is a vector of cells or scalars
 
@@ -8,7 +12,7 @@ function [stats,detailed_data_out]=boostrap_se(anal_opp,data,varargin)
 %   -handle arbitrary number of scalars (as a vector or matrix) for simulanious multi paramerter boostraping
 % Author: Bryce Henson
 % email: Bryce.Henson[the a swirly]live.com you must have
-% '[matlab][boostrap_error]' in the subject line for me to respond
+% '[matlab][bootstrap_error]' in the subject line for me to respond
 % Last revision:2018-10-08
 
 

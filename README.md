@@ -1,10 +1,12 @@
-# boostrap_error
-A matlab function that uses bootstaping to find the standard error in an arbitrary analysis operation.
+# bootstrap_error
+**Bryce M. Henson, Dong K. Shin**  
+Matlab code for fast masking/selection of ordered vectors based on binary search.
+A matlab function that uses bootstrapping to find the standard error in an arbitrary analysis operation.
 
-It only takes a moderate amount of complexity in data analysis before it is difficult to determine the error in the result. Boostraping is a powerfull statistical method that performs the analysis repeatedly on smaller subsets of the data in order to *estimate* the error in the final result (using all the data). Further the method is able to work with an analysis operation that only produces meaningfull results when performed with many data points (such as a linear fit)
+It only takes a moderate amount of complexity in data analysis before it is difficult to determine the error in the result. Bootstrapping is a powerfull statistical method that performs the analysis repeatedly on smaller subsets of the data in order to *estimate* the error in the final result (using all the data). Further the method is able to work with an analysis operation that only produces meaningfull results when performed with many data points (such as a linear fit)
 
 
-**[TO BE CHECKED]** The standard error estimate of the bootraping procedure is reasonably robust against non gaussian distributions and can be used to detect them.  However the error in the sample
+**[TO BE CHECKED]** The standard error estimate of the bootsrapping procedure is reasonably robust against non gaussian distributions and can be used to detect them.  However the error in the sample
 standard error is an inherently biased estimator and any nongaussian distribution will mean that the estimated value will change (decrease?) from the true value with a finite sample size.
 **[TO BE CHECKED]** The method also assumes that the data has no correlations/ that the data set are independent samples. What would correlations do here???
 
@@ -45,7 +47,8 @@ Vol. 81, No. 1 (Jan., 1918), pp. 75-81](http://doi.org/10.2307/2340569)
 ## To Do
 contributors welcome! There is a lot to do to build this into a powerful tool. Drop me an email. 
 - build convergence test for some distributions (normal,uniform,(arb. kurtosis)[https://en.wikipedia.org/wiki/Kurtosis#The_Pearson_type_VII_family]
-- check estimated SE of the SE estimate by nesting the boostraper
+- check estimated SE of the SE estimate by nesting the bootstrapper
+- fix the overestimation of error at small fractions of the dataset
 - more Documentation
   - commenting in main function with links
   - organizing the resources in this readme
