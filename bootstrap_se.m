@@ -1,8 +1,5 @@
-<<<<<<< HEAD:boostrap_se.m
+
 function [stats,detailed_data_out]=boostrap_se(anal_opp,data,varargin)
-=======
-function [stats,outs]=bootstrap_se(anal_opp,data,varargin)
->>>>>>> 8bc4f0be55c7a685527e416cd9a6c06ebcd3551b:bootstrap_se.m
 %funciton calculates the standard error of performing anal_opp(data)
 %data is a vector of cells or scalars
 

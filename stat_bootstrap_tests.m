@@ -1,9 +1,4 @@
 
-%% Making a function out of it
-
-
-%%
-
 data=normrnd(0,1,[1e2,1]);
 anal_opp=@(x) mean(x);
 real_dist_ste=1/sqrt(numel(data));
@@ -104,11 +99,7 @@ real_dist_ste=sqrt((1/12))/sqrt(numel(d_flat));
 %unifrm distributions give an oversetimated error in the SE
 
 fignum=10;
-<<<<<<< HEAD
-[boot,funct_evals]=boostrap_se(@first_elm_avg,data,...
-=======
 boot=bootstrap_se(@first_elm_avg,data,...
->>>>>>> 8bc4f0be55c7a685527e416cd9a6c06ebcd3551b
     'plots',true,...
     'replace',true,...
     'samp_frac_lims',[0.005,0.9],...
@@ -121,6 +112,7 @@ boot=bootstrap_se(@first_elm_avg,data,...
 
 %histogram the residuals to see if the moemnt based error is roughly correct
 figure(2)
+clf
 hist(abs((boot.se_opp-boot.opp_frac_est_se(:,2))./boot.opp_frac_est_se(:,3)),1e2)
 %compare the error in the SE found using the moments to that computed using the spread in data 
 (boot.std_se_opp-boot.std_se_opp_unweighted)/...
