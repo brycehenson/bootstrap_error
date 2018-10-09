@@ -1,6 +1,5 @@
 # bootstrap_error
 **Bryce M. Henson, Dong K. Shin**  
-Matlab code for fast masking/selection of ordered vectors based on binary search.
 A matlab function that uses bootstrapping to find the standard error in an arbitrary analysis operation.
 
 It only takes a moderate amount of complexity in data analysis before it is difficult to determine the error in the result. Bootstrapping is a powerfull statistical method that performs the analysis repeatedly on smaller subsets of the data in order to *estimate* the error in the final result (using all the data). Further the method is able to work with an analysis operation that only produces meaningfull results when performed with many data points (such as a linear fit)
