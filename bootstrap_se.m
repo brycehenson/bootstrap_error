@@ -145,19 +145,16 @@ if iimax>0
     stats.opp_frac_est_se(:,2)=est_se_opp;
     %calculate the estimated sample variance of the estimated sample variance
     if use_mean_se_for_se_se
-        est_var=nanmean(unbias_samp_var);
+        est_var_opp=nanmean(unbias_samp_var);
     else
-        est_var=abs(moments_sub(:,1));
+        est_var_opp=abs(moments_sub(:,1));
     end
-    est_var_std_opp=((1./sample_num_vec).*...
-            sqrt(...
-                moments_sub(:,3)-...
-                ((sample_num_vec-3)./(sample_num_vec-1)).*(moments_sub(:,1).^2)...
-                )...
-            -2.*est_var);
-    est_std_std_opp=sqrt(abs(est_var_std_opp))./sqrt(sample_num_vec-1);
-
-
+    est_var_var_opp=(1./sample_num_vec).*(moments_sub(:,3)-...  
+                ((sample_num_vec-3)./(sample_num_vec-1)).*(moments_sub(:,1).^2));
+    est_std_std_opp=est_se_opp.*0.5.*est_var_var_opp./est_var_opp;
+    %i have no idea where these come from
+    est_std_std_opp=est_std_std_opp.*(sample_num_vec.^(3.5))...
+        .*(repeat_samp.^(-0.5)).*(n_total^(-1));
 
     stats.opp_frac_est_se(:,3)=est_std_std_opp;
     mask=sum(isnan(stats.opp_frac_est_se),2)==0 & sum(isinf(stats.opp_frac_est_se),2)==0;
