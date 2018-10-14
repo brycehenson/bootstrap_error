@@ -26,7 +26,9 @@ As a test it is advisable to check that there is no trend in the estimated stand
 
 ## Error in the estimated error
 - Error in the SE estimate [dist. of sample var.](https://en.wikipedia.org/wiki/Variance#Distribution_of_the_sample_variance) and [centeral moments](https://en.wikipedia.org/wiki/Central_moment)
--see derivation folder
+- see derivation folder
+- https://ijpam.eu/contents/2005-21-3/10/10.pdf
+- https://ijpam.eu/contents/2009-52-1/5/5.pdf
 
 ## Details
 - Finite sample correction from [L. Isserlis,On the Value of a Mean as Calculated from a Sample,J. Royal Stat. Soc
