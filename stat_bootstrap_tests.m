@@ -1,35 +1,4 @@
 
-data=normrnd(0,1,[1e2,1]);
-anal_opp=@(x) mean(x);
-real_dist_ste=1/sqrt(numel(data));
-real_samp_se=std(data,1)/sqrt(numel(data));
-
-
-fignum=10;
-boot=boostrap_se(anal_opp,data,...
-    'plots',true,...
-    'replace',false,...
-    'samp_frac_lims',[0.005,0.9],...
-    'num_samp_frac',1e2,...
-    'num_samp_rep',1e1,...
-    'plot_fig_num',fignum,...
-    'true_dist_se',real_dist_ste,...
-    'true_samp_se',real_samp_se,...
-    'mean_se_for_se_se',0)
-
-%histogram the residuals to see if the moemnt based error is roughly correct
-sfigure(2);
-hist(abs((boot.se_opp-boot.opp_frac_est_se(:,2))./boot.opp_frac_est_se(:,3)),1e2)
-%compare the error in the SE found using the moments to that computed using the spread in data 
-(boot.se_se_opp)/boot.se_se_opp_unweighted
-%find the fraction error in the error estimation
-(real_dist_ste-boot.se_opp)/real_dist_ste
-%find the number of estimated SD the real value is away
-(real_dist_ste-boot.se_opp)/boot.se_se_opp
-
-%%
-
-
 data=rand([1e3,1]);
 anal_opp=@(x) mean(x);
 real_samp_se=std(data,1)/sqrt(numel(data));
