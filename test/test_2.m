@@ -56,14 +56,11 @@ moment_est_se_se/bootstrap_est_se_se
 
 
 %% using the variability with sampling fraction
-
-
-
 iimax=size(nested_boot_record.out_cell,1);
 moment_est_se_se=nan(iimax,1);
 for ii=1:iimax
     cstat=nested_boot_record.out_cell(ii,:);
-    stat_tmp=arrayfun(@(x) cstat{x}.se_se_opp_unweighted,1:numel(cstat));
+    stat_tmp=arrayfun(@(x) cstat{x}.std_se_opp_unweighted,1:numel(cstat));
     moment_est_se_se(ii,1)=mean(stat_tmp);
     moment_est_se_se(ii,2)=std(stat_tmp);
 end

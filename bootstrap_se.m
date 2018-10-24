@@ -1,4 +1,3 @@
-
 function [stats,detailed_data_out]=boostrap_se(anal_opp,data,varargin)
 %funciton calculates the standard error of performing anal_opp(data)
 %data is a vector of cells or scalars
@@ -88,7 +87,7 @@ if iimax>0
     end
 
     if verbose>0
-        fprintf('Bootstaping with different sample fractions %03u:%03u',0)
+        fprintf('Bootstaping with different sample fractions %04u:%04u',0)
     end
     for ii=1:iimax
         n_sample=sample_num_vec(ii);
@@ -130,7 +129,7 @@ if iimax>0
             %replacements, if do_replace finite_pop_corr=1
             moments_sub(ii,1)=moments_sub(ii,1)/finite_pop_corr;
         end
-        if verbose>0, fprintf('\b\b\b%03u',ii), end
+        if verbose>0, fprintf('\b\b\b\b%04u',ii), end
     end
 
     %unbiased sample variance:
