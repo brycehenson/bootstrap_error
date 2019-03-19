@@ -77,6 +77,11 @@ if iimax>0
     %find the size of the output
     %should build in optional argument to specify this
     output_size=nargout(anal_opp);
+    %this will only take the first output of an an anonymous function
+    if output_size==-1
+        output_size=1;
+    end
+    
     out_cell=cell(iimax,repeat_samp_prefactor);
     in_cell=out_cell;
     out_cell_tmp=cell(1,output_size);
