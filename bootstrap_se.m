@@ -92,7 +92,7 @@ if iimax>0
     end
 
     if verbose>0
-        fprintf('Bootstaping with different sample fractions %04u:%04u',0)
+        fprintf('Bootstrapping with different sample fractions %04u:%04u',0)
     end
     for ii=1:iimax
         n_sample=sample_num_vec(ii);

@@ -1,6 +1,7 @@
 # bootstrap_error
 ***Bryce M. Henson, [Dong K. Shin](https://github.com/spicydonkey)***   
 A matlab function that uses bootstrapping to find the standard error in an arbitrary analysis operation.
+**Status:** This core functionality proviced here  **is ready for use in other projects**. Estimation of the error in the error is **not** working and turns out to be a very hard problem. Testing is implemented and passing for the core functonality which provides error determination.
 
 It only takes a moderate amount of complexity in data analysis operation before it is difficult to determine the error in the result. Bootstrapping is a powerfull statistical method that performs the analysis operation repeatedly on smaller subsets of the data in order to *estimate* the error in the final result (using all the data). Further the method is able to work with an analysis operation that only produces meaningfull results when performed with many data points (such as a linear fit)
 
