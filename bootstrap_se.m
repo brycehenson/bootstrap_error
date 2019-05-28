@@ -1,4 +1,4 @@
-function [out,detailed_data_out]=boostrap_se(est_fun,data,varargin)
+function [out,detailed_data_out]=bootstrap_se(est_fun,data,varargin)
 %funciton calculates the standard error of performing est_fun(data)
 %data is a vector of cells or scalars
 
@@ -21,7 +21,7 @@ p = inputParser;
 is_lims=@(x) (isequal(size(x),[1,2]) && (isnumeric(x) && x(2)<10 && x(1)>1e-4))...
         || (isscalar(x) && x<=1 && x>min_frac);
 is_c_logical=@(in) isequal(in,true) || isequal(in,false); %can x be cast as a logical
-addOptional(p,'replace',false,is_c_logical);
+addOptional(p,'replace',true,is_c_logical);
 addOptional(p,'num_samp_frac',10,@(x) isnumeric(x) & x>=1);
 addOptional(p,'num_samp_rep',10,@(x) isnumeric(x) & x>=1);
 addOptional(p,'samp_frac_lims',0.1,is_lims);
@@ -36,12 +36,21 @@ addOptional(p,'verbose',1,@(x) isscalar(x) & x>=0);
 addOptional(p,'opp_arguments',{},@(x) iscell(x) & size(x,1)==1);
 addOptional(p,'plot_fig_name','',@ischar);
 addOptional(p,'do_mean_fit',1,is_c_logical)
+addOptional(p,'use_weighting',true,is_c_logical)
+addOptional(p,'norm_weighting',false,is_c_logical)
 parse(p,varargin{:});
 
 do_mean_fit=p.Results.do_mean_fit;
 do_plots=coerce_logical(p.Results.plots);
 do_replace=coerce_logical(p.Results.replace);
 use_mean_se_for_se_se=coerce_logical(p.Results.mean_se_for_se_se);
+use_weighting=coerce_logical(p.Results.use_weighting);
+norm_weighting=coerce_logical(p.Results.norm_weighting);
+
+if use_mean_se_for_se_se
+    warning('mean_se_for_se_se is depricated')
+end
+
 save_multi_out=coerce_logical(p.Results.save_multi_out);
 save_input_data=coerce_logical(p.Results.save_input_data);
 verbose=p.Results.verbose;
@@ -74,230 +83,342 @@ sample_num_vec=sample_num_vec(mask);
 sample_frac_vec=sample_frac_vec(mask);
 iimax=numel(sample_frac_vec);
 
+% the number of repeated sampling for a given sample size
+% i have built the ability for this to vary but decided against it to prevent biasing
+repeat_samp=repeat_samp_prefactor+0*sample_frac_vec; 
+            
 %catch when there are no valid sample sizes
-if iimax>0
-    %prealocate the moments of the distribution
-    mean_sub=NaN(numel(sample_frac_vec),1);
-    moments_sub=NaN(numel(sample_frac_vec),3);
-    repeat_samp=NaN(numel(sample_frac_vec),1);
+if iimax==0
+    error('no sample fracions')
+end
 
-    %find the output size of the passed estimator function
-    %should build in optional argument to specify this
-    output_size=nargout(est_fun);
-    %this will only take the first output of an an anonymous function
-    if output_size==-1
-        output_size=1;
-    end
-    
-    out_cell=cell(iimax,repeat_samp_prefactor);
-    in_cell=out_cell;
-    out_cell_tmp=cell(1,output_size);
-    if output_size>1 && save_multi_out
-        multi_out=true;
-    else
-        multi_out=false;
-    end
+%prealocate the moments of the distribution
+mean_sub=NaN(numel(sample_frac_vec),1);
+moments_sub=NaN(numel(sample_frac_vec),3);
+%find the output size of the passed estimator function
+%should build in optional argument to specify this
+output_size=nargout(est_fun);
+%this will only take the first output of an an anonymous function
+if output_size==-1
+    output_size=1;
+end
 
-    if verbose>0
-        fprintf('Bootstrapping with different sample fractions %04u:%04u',0)
-    end
-    for ii=1:iimax
-        n_sample=sample_num_vec(ii);
-        %std means nothing for n<3
-        %the finte sample correaction for the no replacements method breaks when n_sample=ntot
-        if n_sample>3 && (n_sample<n_total || do_replace)
-            %this is alowed to vary
-            repeat_samp(ii)=round(repeat_samp_prefactor); %*1/sample_frac
-            est_fun_res_sub=NaN(repeat_samp(ii),1);
-            if do_replace
-                finite_pop_corr=1;
+out_cell=cell(iimax,repeat_samp_prefactor);
+in_cell=out_cell;
+out_cell_tmp=cell(1,output_size);
+if output_size>1 && save_multi_out
+    multi_out=true;
+else
+    multi_out=false;
+end
+
+if verbose>0
+    fprintf('Bootstrapping with different sample fractions %04u:%04u',0)
+end
+for ii=1:iimax
+    n_sample=sample_num_vec(ii);
+    %std means nothing for n<3
+    %the finte sample correaction for the no replacements method breaks when n_sample=ntot
+    if n_sample>3 && (n_sample<n_total || do_replace)
+        est_fun_res_sub=NaN(repeat_samp(ii),1); %the results of the estimation function
+        if do_replace
+            finite_pop_corr=1;
+        else
+            finite_pop_corr=(n_total-n_sample)/(n_total-1);
+        end 
+        for jj=1:repeat_samp(ii)
+            %calculate the analysis operation on the subset of dat
+            data_smpl=randsample(data,n_sample,do_replace);
+            %then we assign the output of the est_fun on the data_smp to est_fun_res_sub
+            %matalb cant do [out_cell_tmp{:}]=scalar so a case statement
+            %is needed
+            if multi_out
+                [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
+                est_fun_res_sub(jj)=out_cell_tmp{1};
+                out_cell{ii,jj}=out_cell_tmp{2:end};
             else
-                finite_pop_corr=(n_total-n_sample)/(n_total-1);
+                est_fun_res_sub(jj)=est_fun(data_smpl,opp_arguments{:});
             end 
-            for jj=1:repeat_samp(ii)
-                %calculate the analysis operation on the subset of dat
-                data_smpl=randsample(data,n_sample,do_replace);
-                %then we assign the output of the est_fun on the data_smp to est_fun_res_sub
-                %matalb cant do [out_cell_tmp{:}]=scalar so a case statement
-                %is needed
-                if multi_out
-                    [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
-                    est_fun_res_sub(jj)=out_cell_tmp{1};
-                    out_cell{ii,jj}=out_cell_tmp{2:end};
-                else
-                    est_fun_res_sub(jj)=est_fun(data_smpl,opp_arguments{:});
-                end 
-                if save_input_data
-                    in_cell{ii,jj}=data_smpl;
-                end
+            if save_input_data
+                in_cell{ii,jj}=data_smpl;
             end
-            mean_sub(ii)=mean(est_fun_res_sub);
-            % biased sample variance of the subset
-            moments_sub(ii,1)=moment(est_fun_res_sub,2);
-            moments_sub(ii,2)=moment(est_fun_res_sub,3);
-            moments_sub(ii,3)=moment(est_fun_res_sub,4);
-
-            %use finte population correction to estimate the population std using sampling without
-            %replacements, if do_replace finite_pop_corr=1
-            moments_sub(ii,1)=moments_sub(ii,1)/finite_pop_corr;
         end
-        if verbose>0, fprintf('\b\b\b\b%04u',ii), end
+        % calculate statistics on the results with a given sample size
+        mean_sub(ii)=mean(est_fun_res_sub);
+        % biased sample variance of the subset
+        moments_sub(ii,1)=moment(est_fun_res_sub,2);
+        moments_sub(ii,2)=moment(est_fun_res_sub,3);
+        moments_sub(ii,3)=moment(est_fun_res_sub,4);
+
+        %use finte population correction to estimate the population std using sampling without
+        %replacements, if do_replace finite_pop_corr=1
+        moments_sub(ii,1)=moments_sub(ii,1)/finite_pop_corr;
     end
-    
-    out=[];
+    if verbose>0, fprintf('\b\b\b\b%04u',ii), end
+end
+ fprintf('\n')
+ 
+out=[];
+unbias_factor=(repeat_samp./(repeat_samp-1));
+unbias_moments_sub= moments_sub.*repmat(unbias_factor,1,size(moments_sub,2));
+%unbiased sample variance for the results of each bootstrap of a given size:
+unbias_samp_var=unbias_moments_sub(:,1);
+% biased sample standard deviation
+%TODO calulate unbiased sample standard deviation (correcting for sqrt bias)
+std_est_subsamp=sqrt(unbias_samp_var); 
+% baised sample standard error for each bootstrap size
+ste_est_subsamp=std_est_subsamp./sqrt(repeat_samp);
 
-    
-    %unbiased sample variance:
-    unbias_samp_var=(repeat_samp./(repeat_samp-1)).* moments_sub(:,1);
-    std_est_subsamp=sqrt(unbias_samp_var); %TODO calulate unbiased sample standard deviation
-    
-    %now calulate the corrected sample standard deviation in the anal
-    %operation on the whole datset
-    est_se_opp=std_est_subsamp...
-        .*sqrt(sample_num_vec)./sqrt(n_total);
-    out.moments_sub=moments_sub;
-    out.opp_frac_est_se(:,1)=sample_frac_vec;
-    out.opp_frac_est_se(:,2)=est_se_opp;
+%now calulate the standard error in the anal
+%operation on the whole datset assuming mean like scaling
+% if this is flat with sample size then the estimator is mean-like (which is good)
+mean_like_scaling_factor=sqrt(sample_num_vec)./sqrt(n_total);
+est_se_opp=std_est_subsamp.*mean_like_scaling_factor;
 
-    %the mean of the estimation function as a function of data subsample
-    %size tells us about the bais of the estimation function
-    out.sampled_est.mean.val=mean_sub;
-    out.sampled_est.mean.se=std_est_subsamp./sqrt(repeat_samp);
-    out.sampled_est.samp_num=sample_num_vec;
-    out.sampled_est.samp_repeats=sample_num_vec;
+%now we wish to give our best guess on what the standard error on the whole dataset will be
+% as a first guess we could take the mean across sampling fraction
+est_se_opp_mean_unweighted=nanmean(est_se_opp);
+% and the asociated error
+est_std_opp_se_unweighted= std(est_se_opp);
+est_se_opp_se_unweighted=est_std_opp_se_unweighted./sqrt(numel(est_se_opp));
 
-    
-    %calculate the estimated sample variance of the estimated sample variance
-    if use_mean_se_for_se_se
-        est_var_opp=nanmean(unbias_samp_var);
+%% weighted SE(fun(data)),SE(SE(fun(data)))
+% we could weight each estimated value, to do that we need some way of estimating what the expected standard deviation
+% is for estimating the standard deviaiton in each subsample
+% TODO come up with reasonable estimate of the se in the sample std
+%https://en.wikipedia.org/wiki/Variance#Distribution_of_the_sample_variance
+
+
+% if we assume normality then things are pretty easy
+var_samp_var_norm=2*(std_est_subsamp.^4)/(repeat_samp-1);
+% now we will do a crude aproximation and propagate this as var[s^2] to std(sigma)
+%using a=b^(1/2) sigma(a)=(1/2)*sigma(b)*b^(-1/2)  sigma(a)=(1/2)*sigma(b)/a
+se_samp_std_norm=(1/2)*sqrt(var_samp_var_norm)./std_est_subsamp;
+se_samp_std_norm=se_samp_std_norm;
+std_se_opp_norm=se_samp_std_norm*mean_like_scaling_factor;
+% to do this properly we could do a change of variables on the chi-squared distribution
+%https://en.wikipedia.org/wiki/Probability_density_function#Dependent_variables_and_change_of_variables
+
+% lets now find the weighted values of the predicted SE values
+weights=1./(std_se_opp_norm.^2);
+% and the asociated error
+[est_se_opp_se_weighted_norm,est_se_opp_mean_weighted_norm]=sewm(est_se_opp,weights);
+
+
+% if we do not assume normality
+% we can use 4th centeral (unbiased) moment over the subsamples 
+var_samp_var_arb=(1./repeat_samp).*(unbias_moments_sub(:,3)-(std_est_subsamp.^4).*((repeat_samp-3)./(repeat_samp-1)));
+se_samp_std_arb=(1/2).*sqrt(var_samp_var_arb)./std_est_subsamp;
+std_se_opp_arb=se_samp_std_arb.*mean_like_scaling_factor;
+% this seems to do very well in my tests
+
+std_se_opp_plot=std_se_opp_arb;
+
+% lets now find the weighted values of the predicted SE values
+weights=1./(std_se_opp_arb.^2);
+% and the asociated error
+[est_se_opp_se_weighted_arb,est_se_opp_mean_weighted_arb]=sewm(est_se_opp,weights);
+
+% in my tests i have found that all these options to estimate the output error are underestimates of ~3x 
+% perhaps it is something like a finite sample correction that i have not included
+
+%% save some outputs
+% two outputs one out.sampling that gives the details of the sampling process
+% the second out.result will contain the useful results est se in full anal ect
+% the main output will be 
+
+out.sampling.moments_sub=moments_sub;
+out.sampling.mean=mean_sub;
+out.sampling.ste=ste_est_subsamp;
+out.sampling.std=std_est_subsamp;
+out.sampling.se_std_norm=se_samp_std_norm;
+out.sampling.se_std_arb=se_samp_std_arb;
+out.sampling.projected_whole_se=est_se_opp;
+out.sampling.std_projected_whole_se_norm=std_se_opp_norm;
+out.sampling.std_projected_whole_se_arb=std_se_opp_arb;
+out.sampling.sample_repeats=repeat_samp;
+out.sampling.sample_size=sample_num_vec;
+
+out.results.se_fun_whole_unweighted=est_se_opp_mean_unweighted;
+out.results.se_se_fun_whole_unweighted=est_se_opp_se_unweighted;
+
+out.results.se_fun_whole_weighted_arb=est_se_opp_mean_weighted_arb;
+out.results.se_se_fun_whole_weighted_arb=est_se_opp_se_weighted_arb;
+
+out.results.se_fun_whole_weighted_norm=est_se_opp_mean_weighted_norm;
+out.results.se_se_fun_whole_weighted_norm=est_se_opp_se_weighted_norm;
+
+% set the outputs based on what input options were chosen
+if use_weighting
+    if norm_weighting
+        out.results.se_fun_whole=out.results.se_fun_whole_weighted_norm;
+        out.results.se_se_fun_whole=out.results.se_se_fun_whole_weighted_norm;
     else
-        est_var_opp=abs(moments_sub(:,1));
+        out.results.se_fun_whole=out.results.se_fun_whole_weighted_arb;
+        out.results.se_se_fun_whole=out.results.se_se_fun_whole_weighted_arb;
     end
-    est_var_var_opp=(1./sample_num_vec).*(moments_sub(:,3)-...  
-                ((sample_num_vec-3)./(sample_num_vec-1)).*(moments_sub(:,1).^2));
-    est_std_std_opp=est_se_opp.*0.5.*est_var_var_opp./est_var_opp;
-    %i have no idea where these come from
-    est_std_std_opp=est_std_std_opp.*(sample_num_vec.^(3.5))...
-        .*(repeat_samp.^(-0.5)).*(n_total^(-1));
+else
+    out.results.se_fun_whole=est_se_opp_mean_unweighted;
+    out.results.se_se_fun_whole=est_se_opp_se_unweighted;
+end
 
-    out.opp_frac_est_se(:,3)=est_std_std_opp;
-    mask=sum(isnan(out.opp_frac_est_se),2)==0 & sum(isinf(out.opp_frac_est_se),2)==0;
-    out.opp_frac_est_se=out.opp_frac_est_se(mask,:);
-    
-    
-    out.se_opp_unweighted=nanmean(out.opp_frac_est_se(:,2));
-    %calucalte the weighted mean of the estimates SE
-    out.se_opp=nansum(out.opp_frac_est_se(:,2)...
-                    ./(out.opp_frac_est_se(:,3).^2))./...
-                nansum(1./(out.opp_frac_est_se(:,3).^2));
-    out.se_se_opp=sqrt(1./sum((out.opp_frac_est_se(:,3).^-2)));
-    out.std_se_opp=out.se_se_opp.*sqrt(sum(~isnan(out.opp_frac_est_se(:,2))));
-    if numel(out.opp_frac_est_se(:,2))==1
-        out.std_se_opp_unweighted=nan;
-    else
-        out.std_se_opp_unweighted=nanstd(out.opp_frac_est_se(:,2));
-    end
-    out.se_se_opp_unweighted=out.std_se_opp_unweighted...
-        /sqrt(sum(~isnan(out.opp_frac_est_se(:,2))));
 
-    %% try to fit the dependence of mean est fun (subset) so that we can estimate the bias
-   if do_mean_fit
+
+%out.opp_frac_est_se(:,1)=sample_frac_vec;
+%out.opp_frac_est_se(:,2)=est_se_opp;
+
+%the mean of the estimation function as a function of data subsample
+%size tells us about the bais of the estimation function
+
+
+%% try to fit the dependence of mean est fun (subset) so that we can estimate the bias with sample size
+if do_mean_fit
     modelfun=@(b,x) b(1)+b(2).*x;
-    weights=1./(out.sampled_est.mean.se.^2);
+    weights=1./(out.sampling.ste.^2);
     weights=weights./sum(weights);
-    
-    beta0=[mean(out.sampled_est.mean.val),0];
+
+    beta0=[mean(out.sampling.mean),0];
     cof_names={'offset','grad'};
     opt = statset('TolFun',1e-10,'TolX',1e-10,...
             'MaxIter',1e4,... %1e4
             'UseParallel',1);
-    fitobject=fitnlm(out.sampled_est.samp_num,out.sampled_est.mean.val,modelfun,beta0,...
+    fitobject=fitnlm(out.sampling.sample_size,out.sampling.mean,modelfun,beta0,...
         'Weights',weights,'options',opt,...
         'CoefficientNames',cof_names);
     out.est_mean_dep_fit=fitobject;
     %%itparam=fitobject.Coefficients;
     %osc_fit.model_coefs(ii,:,:)=[fitparam.Estimate,fitparam.SE];
-    is_grad_sig=fitobject.Coefficients.pValue(2)<0.05;
-    if ~is_grad_sig
-        warning('%s: warning fit to mean of set fun subset shows that the gradient is not withing error of zero',mfilename)
+    sigma_threshold=3;%number of standard deviations away from zero to be signfigant
+    is_grad_sig=abs(fitobject.Coefficients.Estimate(2))>fitobject.Coefficients.SE(2)*sigma_threshold;
+    if ~is_grad_sig && verbose>0
+        warning('%s: warning fit to mean of est fun subset shows that the gradient with data size is not within %.0f sd of zero',mfilename,sigma_threshold)
     end
-   end
-    
-    if verbose>0, fprintf('..Done\n'), end
-    if do_plots
-        if isempty(p.Results.plot_fig_name) || isequal(p.Results.plot_fig_name,'')
-            stfig('bootstrap results','add_stack',1);
-        else
-            stfig(p.Results.plot_fig_name,'add_stack',1);
-        end
-        subplot(2,1,1)
-        errorbar(out.sampled_est.samp_num,out.opp_frac_est_se(:,2),...
-        out.opp_frac_est_se(:,3),'ko',...
-        'CapSize',0,...
-        'MarkerSize',6,...
-        'MarkerEdgeColor','k',...
-        'MarkerFaceColor',[1,1,1]*0.2)
-        hold on
-        xl=xlim(gca);
-        yl=ylim(gca);
-        line(xl,[1,1]*out.se_opp,'Color','k','LineWidth',2)
-        line(xl,[1,1]*(out.se_opp-out.std_se_opp_unweighted),'Color','m','LineWidth',2)
-        line(xl,[1,1]*(out.se_opp+out.std_se_opp_unweighted),'Color','m','LineWidth',2)
-        line([1,1]*n_total,yl,'Color','k','LineWidth',2)
-        
-        legends={'Est SE','mean Est SE','+std Est SE','-std Est SE','data size'};
-        if ~isnan(p.Results.true_dist_se)
-            legends=[legends,'true dist SE'];
-            line(xl,[1,1]*p.Results.true_dist_se,'Color','r','LineWidth',2)
-        end
-        if ~isnan(p.Results.true_samp_se)
-            legends=[legends,'true Samp SE'];
-            line(xl,[1,1]*p.Results.true_samp_se,'Color','b','LineWidth',2)
-        end
-        hold off
-        legend(legends)
-        xlabel('subsample fraction of whole data set')
-        ylabel('est. SE in estimator function on whole data set')
-        drawnow
-        subplot(2,1,2)
-        errorbar(out.sampled_est.samp_num,out.sampled_est.mean.val,out.sampled_est.mean.se,'ko',...
-        'CapSize',0,...
-        'MarkerSize',6,...
-        'MarkerEdgeColor','k',...
-        'MarkerFaceColor',[1,1,1]*0.2)
-        xlabel('subsample fraction of whole data set')
-        ylabel('mean est fun of subsample')
-        if do_mean_fit
-            hold on
-            x_plot_fit=col_vec(linspace(min(out.sampled_est.samp_num),max(out.sampled_est.samp_num),1e4));
-            [y_plot_fit_val,y_plot_fit_ci]=predict(fitobject,x_plot_fit);
-            plot(x_plot_fit,y_plot_fit_val,'r')
-            plot(x_plot_fit,y_plot_fit_ci(:,1),'g')
-            plot(x_plot_fit,y_plot_fit_ci(:,2),'g')
-            hold off
-        end
-        
-        
-        yl=ylim(gca);
-        line([1,1]*n_total,yl,'Color','k','LineWidth',2)
-
-        %check that the estimated errors look about right
-        %hist(abs((boot.se_opp-boot.opp_frac_est_se(:,2))./boot.opp_frac_est_se(:,3)),1e2)
-    end
-    detailed_data_out=[];
-    if save_multi_out, detailed_data_out.out_cell=out_cell; end
-    if save_input_data, detailed_data_out.in_cell=in_cell; end
-    detailed_data_out.sample_num_vec=sample_num_vec;
-    detailed_data_out.sample_frac_vec=sample_frac_vec;
-else %if there are no valid sample sizes then set the output to nans
-    out.opp_frac_est_se=nan;
-    out.se_opp_unweighted=nan;
-    %calucalte the weighted mean of the estimates SE
-    out.se_opp=nan;
-    out.se_se_opp=nan;
-    out.std_se_opp=nan;
-    detailed_data_out=[];
 end
+
+if do_plots
+    if isempty(p.Results.plot_fig_name) || isequal(p.Results.plot_fig_name,'')
+        stfig('bootstrap results','add_stack',1);
+    else
+        stfig(p.Results.plot_fig_name,'add_stack',1);
+    end
+    clf
+    subplot(2,1,1)
+    errorbar(out.sampling.sample_size,out.sampling.projected_whole_se,...
+    std_se_opp_plot,'ko',...
+    'CapSize',0,...
+    'MarkerSize',6,...
+    'LineWidth',1.5,...
+    'MarkerEdgeColor','k',...
+    'MarkerFaceColor',[1,1,1]*0.3);
+    hold on
+    xl=xlim(gca);
+    
+
+    
+    line(xl,[1,1]*est_se_opp_mean_unweighted,'Color','k','LineWidth',2)
+    line(xl,[1,1]*(est_se_opp_mean_unweighted-est_std_opp_se_unweighted),'Color','m','LineWidth',2)
+    line(xl,[1,1]*(est_se_opp_mean_unweighted+est_std_opp_se_unweighted),'Color','m','LineWidth',2)
+    legends={'Est SE','mean Est SE','+std Est SE','-std Est SE'};
+    if ~isnan(p.Results.true_dist_se)
+        legends=[legends,'true dist SE'];
+        line(xl,[1,1]*p.Results.true_dist_se,'Color','r','LineWidth',2)
+    end
+    if ~isnan(p.Results.true_samp_se)
+        legends=[legends,'true Samp SE'];
+        line(xl,[1,1]*p.Results.true_samp_se,'Color','b','LineWidth',2)
+    end
+    
+    
+    if max(xl)>=n_total
+        yl=ylim(gca);
+        line([1,1]*n_total,yl,'Color',[1,1,1]*0.7,'LineWidth',2);
+    %bring the point which has all the data on top of the line so that the error bar can be seen
+        chi=get(gca, 'Children');
+        set(gca, 'Children',flipud(chi))
+        legends=[legends,'total data size'];
+    end
+    legend(legends)
+    hold off
+    xlabel(sprintf('subsample size (whole data set =%u, vert line)',n_total))
+    ylabel('est. SE in estimator function on whole data set')
+
+
+    subplot(2,1,2)
+    errorbar(out.sampling.sample_size,out.sampling.mean,out.sampling.ste,'ko',...
+    'CapSize',0,...
+    'MarkerSize',6,...
+    'LineWidth',1.5,...
+    'MarkerEdgeColor','k',...
+    'MarkerFaceColor',[1,1,1]*0.3)
+    hold on
+    xlabel(sprintf('subsample size (whole data set =%u, vert line)',n_total))
+    ylabel('mean est fun of subsample')
+    legends={'Est mean'};
+    if do_mean_fit
+        x_plot_fit=col_vec(linspace(min(out.sampling.sample_size),max(out.sampling.sample_size),1e4));
+        [y_plot_fit_val,y_plot_fit_ci]=predict(fitobject,x_plot_fit);
+        plot(x_plot_fit,y_plot_fit_val,'r')
+        plot(x_plot_fit,y_plot_fit_ci(:,1),'g')
+        plot(x_plot_fit,y_plot_fit_ci(:,2),'g')
+        legends=[legends,'fit','fit+ci','fit-ci'];
+    end
+    
+    
+    if max(xl)>=n_total
+        yl=ylim(gca);
+        line([1,1]*n_total,yl,'Color',[1,1,1]*0.7,'LineWidth',2);
+    %bring the point which has all the data on top of the line so that the error bar can be seen
+        chi=get(gca, 'Children');
+        set(gca, 'Children',flipud(chi))
+        legends=[legends,'total data size'];
+    end
+    hold off
+    drawnow
+    legend(legends)
+    %check that the estimated errors look about right
+    %hist(abs((boot.se_opp-boot.opp_frac_est_se(:,2))./boot.opp_frac_est_se(:,3)),1e2)
+    
+    if verbose>4   
+        stfig('bootstrap diagnostics','add_stack',1);
+        
+        error_std_whole_to_mean=out.sampling.projected_whole_se-est_se_opp_mean_unweighted;
+        sigma_diff_arb=error_std_whole_to_mean./std_se_opp_arb;
+        sigma_diff_norm=error_std_whole_to_mean./std_se_opp_norm;
+        fprintf('std of error/est error for arb dist %f , norm dist %f \n',std(sigma_diff_arb),std(sigma_diff_norm))
+        subplot(2,2,1)
+        plot(out.sampling.sample_size,sigma_diff_arb,'r')
+        hold on
+        plot(out.sampling.sample_size,sigma_diff_norm,'b')
+        hold off
+        xlabel(sprintf('subsample size (whole data set =%u)',n_total))
+        ylabel('error in est SE/predicted error')
+        subplot(2,2,2)
+        histogram(sigma_diff_arb,round(numel(sigma_diff_arb)/10),'FaceColor','r')
+        xlabel('error in est SE/predicted error')
+        hold on
+        histogram(sigma_diff_norm,round(numel(sigma_diff_norm)/10),'FaceColor','b')
+        hold off
+        subplot(2,2,3)
+        mean_val=nanmean(out.sampling.mean);
+        error_mean=out.sampling.mean-mean_val;
+        sigma_diff_val=error_mean./out.sampling.ste;
+        plot(out.sampling.sample_size,sigma_diff_val,'r')
+        xlabel(sprintf('subsample size (whole data set =%u)',n_total))
+        ylabel('error in est val/predicted error')
+        subplot(2,2,4)
+        histogram(sigma_diff_val,round(numel(sigma_diff_val)/10))
+        xlabel('error in est val/predicted error')
+        fprintf('std of val error %f \n',std(sigma_diff_val))
+    end
+     
+end
+detailed_data_out=[];
+if save_multi_out, detailed_data_out.out_cell=out_cell; end
+if save_input_data, detailed_data_out.in_cell=in_cell; end
+detailed_data_out.sample_num_vec=sample_num_vec;
+detailed_data_out.sample_frac_vec=sample_frac_vec;
+
+if verbose>0, fprintf('..Done\n'), end
 
 %
 end

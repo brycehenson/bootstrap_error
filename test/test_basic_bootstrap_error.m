@@ -5,7 +5,7 @@ real_samp_se=std(data,1)/sqrt(numel(data));
 real_dist_ste=sqrt((1/12))/sqrt(numel(data));
 %unifrm distributions give an oversetimated error in the SE
 
-fignum=10;
+
 boot=bootstrap_se(anal_opp,data,...
     'plots',true,...
     'replace',true,...
@@ -14,17 +14,50 @@ boot=bootstrap_se(anal_opp,data,...
     'num_samp_rep',1e2,...
     'true_dist_se',real_dist_ste,...
     'true_samp_se',real_samp_se,...
-    'mean_se_for_se_se',1)
+    'verbose',10)
 
-%histogram the residuals to see if the moemnt based error is roughly correct
-sfigure(2);
-hist(abs((boot.se_opp-boot.opp_frac_est_se(:,2))./boot.opp_frac_est_se(:,3)),1e2)
-%compare the error in the SE found using the moments to that computed using the spread in data 
-(boot.se_se_opp)/boot.se_se_opp_unweighted
 %find the fraction error in the error estimation
-(real_dist_ste-boot.se_opp)/real_dist_ste
+(real_dist_ste-boot.results.se_fun_whole)/real_dist_ste
 %find the number of estimated SD the real value is away
-(real_dist_ste-boot.se_opp)/boot.se_se_opp
+(real_dist_ste-boot.results.se_fun_whole)/boot.results.se_se_fun_whole
+
+%% Repeat to see what the distibution in the output values are
+est_se=[];
+est_se_se=[];
+sigma_err=[];
+fprintf('%04u',0)
+for ii=1:100
+data=rand([1e3,1]);
+anal_opp=@(x) mean(x);
+real_samp_se=std(data,1)/sqrt(numel(data));
+real_dist_ste=sqrt((1/12))/sqrt(numel(data));
+%unifrm distributions give an oversetimated error in the SE
+
+boot=bootstrap_se(anal_opp,data,...
+    'plots',false,...
+    'replace',true,...
+    'samp_frac_lims',[0.005,0.1],...
+    'num_samp_frac',1e2,...
+    'num_samp_rep',1e2,...
+    'true_dist_se',real_dist_ste,...
+    'true_samp_se',real_samp_se,...
+    'verbose',0);
+
+est_se(ii)=boot.results.se_fun_whole_weighted_arb;
+est_se_se(ii)=boot.results.se_se_fun_whole_weighted_arb;
+sigma_err(ii)=(real_dist_ste-boot.results.se_fun_whole_weighted_arb)/boot.results.se_se_fun_whole_weighted_arb;
+fprintf('\b\b\b\b\b%04u',ii)
+end
+fprintf('\n')
+%%
+stfig('results distribution')
+histogram(col_vec(sigma_error),round(numel(sigma_error)/5))
+xlabel('number of standard deviations')
+fprintf('std of est se values %f, mean se se %f \n',std(est_se),mean(est_se_se))
+fprintf('sigma error from mean %f\n',std(sigma_err))
+fprintf('val sd / mean err  %f\n',std(est_se)/mean(est_se_se))
+
+
 
 %%
 
@@ -42,20 +75,18 @@ boot=bootstrap_se(@(x) mean(mean(cell2mat(x))),data,...
     'samp_frac_lims',[0.005,0.9],...
     'num_samp_frac',1e1,...
     'num_samp_rep',1e2,...
-    'plot_fig_num',fignum,...
     'true_dist_se',real_dist_ste,...
-    'true_samp_se',real_samp_se)
+    'true_samp_se',real_samp_se,...
+    'verbose',10)
 
 %histogram the residuals to see if the moemnt based error is roughly correct
-figure(2)
-hist(abs((boot.se_opp-boot.opp_frac_est_se(:,2))./boot.opp_frac_est_se(:,3)),1e2)
 %compare the error in the SE found using the moments to that computed using the spread in data 
-(boot.std_se_opp-boot.std_se_opp_unweighted)/...
-    min(boot.std_se_opp_unweighted)
+(boot.results.se_se_fun_whole_weighted_arb-boot.results.se_se_fun_whole_unweighted)/...
+    boot.results.se_se_fun_whole_unweighted
 %find the fraction error in the error estimation
-(real_dist_ste-boot.se_opp)/real_dist_ste
+(real_dist_ste- boot.results.se_fun_whole)/real_dist_ste
 %find the number of estimated SD the real value is away
-(real_dist_ste-boot.se_opp)/boot.std_se_opp
+(real_dist_ste- boot.results.se_fun_whole)/boot.results.se_se_fun_whole_weighted_arb
 
 
 %%
@@ -66,20 +97,17 @@ gen_norm_measure=@(x,n) norm(x,n)*(numel(x)^(-1/n));
 anal_opp=@(x) gen_norm_measure(x,6); %norm(x,2);
 %unifrm distributions give an oversetimated error in the SE
 
-fignum=10;
+
 boot=bootstrap_se(anal_opp,data,...
     'plots',true,...
     'replace',true,...
     'samp_frac_lims',[0.5,1.5],...
     'num_samp_frac',1e2,...
     'num_samp_rep',1e2,...
-    'mean_se_for_se_se',1)
+    'verbose',10)
 
-%histogram the residuals to see if the moemnt based error is roughly correct
-sfigure(2);
-hist(abs((boot.se_opp-boot.opp_frac_est_se(:,2))./boot.opp_frac_est_se(:,3)),1e2)
 %compare the error in the SE found using the moments to that computed using the spread in data 
-(boot.se_se_opp)/boot.se_se_opp_unweighted
+(boot.results.se_fun_whole_unweighted-boot.results.se_fun_whole_weighted_arb)/boot.results.se_fun_whole_weighted_arb
 
 %%
 
@@ -97,22 +125,16 @@ boot=bootstrap_se(@first_elm_avg,data,...
     'samp_frac_lims',[0.005,0.9],...
     'num_samp_frac',1e2,...
     'num_samp_rep',1e2,...
-    'plot_fig_num',fignum,...
     'true_dist_se',real_dist_ste,...
     'true_samp_se',real_samp_se,...
-    'save_multi_out',1)
+    'save_multi_out',1,...
+    'verbose',10)
 
-%histogram the residuals to see if the moemnt based error is roughly correct
-figure(2)
-clf
-hist(abs((boot.se_opp-boot.opp_frac_est_se(:,2))./boot.opp_frac_est_se(:,3)),1e2)
 %compare the error in the SE found using the moments to that computed using the spread in data 
-(boot.std_se_opp-boot.std_se_opp_unweighted)/...
-    min(boot.std_se_opp_unweighted)
-%find the fraction error in the error estimation
-(real_dist_ste-boot.se_opp)/real_dist_ste
-%find the number of estimated SD the real value is away
-(real_dist_ste-boot.se_opp)/boot.std_se_opp
+(boot.results.se_fun_whole_unweighted-boot.results.se_fun_whole_weighted_arb)/boot.results.se_fun_whole_weighted_arb
+(real_dist_ste- boot.results.se_fun_whole)/real_dist_ste
+% number of sigma away from true value
+(real_dist_ste- boot.results.se_fun_whole)/boot.results.se_se_fun_whole
 
 
 function [out1,out2]=first_elm_avg(in) 
