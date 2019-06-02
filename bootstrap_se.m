@@ -7,18 +7,22 @@ function [out,detailed_data_out]=bootstrap_se(est_fun,data,varargin)
 % Known BUGS/ Possible Improvements
 %   -handle arbitrary number of scalars (as a vector or matrix) for simulanious multi paramerter boostraping
 %   - [ ] simplify codeflow with subfunctions
-%   - [ ] add in functionality to look at the mean with the sample fraction
-%   - [ ] design a way to schedule in the number of evaluations for each sample fraction
+%   - [x] add in functionality to look at the mean with the sample fraction
+%   - [x] add in biasing corrections
+%     - [x] corrections for standard deviation assuming normality
+%   - [x] error in the error
+%     - [x] unbiased std of the estimated std of the distribution assuming normality
+%     - [x] approx std of the estimated std for arb distribution
+%     - [x] c4 unbiasing function
 % Author: Bryce Henson
 % email: Bryce.Henson[the a swirly]live.com you must have
 % '[matlab][bootstrap_error]' in the subject line for me to respond
-% Last revision:2018-10-08
+% Last revision:2019-06-02
 
-min_frac=1e-4;
-min_num=5;
+min_num=5; %minimum data size for resampling
 
 p = inputParser;
-is_lims=@(x) (isequal(size(x),[1,2]) && (isnumeric(x) && x(2)<10 && x(1)>1e-4))...
+is_lims=@(x) (isequal(size(x),[1,2]) && (isnumeric(x) && x(2)<10 && x(1)>0))...
         || (isscalar(x) && x<=1 && x>min_frac);
 is_c_logical=@(in) isequal(in,true) || isequal(in,false); %can x be cast as a logical
 addOptional(p,'replace',true,is_c_logical);
@@ -61,13 +65,17 @@ repeat_samp_prefactor=p.Results.num_samp_rep;
 %if the number of fractions to sample is one
 if p.Results.num_samp_frac==1
      sample_frac_vec=mean(p.Results.samp_frac_lims);
+elseif isscalar(p.Results.samp_frac_lims) || p.Results.num_samp_frac==1
+    if size(p.Results.samp_frac_lims,2)==2 
+        warning('sample fraction limits specified but num_sample_fac=1 taking the max sample fraction')
+    end
+    sample_frac_vec=p.Results.samp_frac_lims(end);
 %sample over multiple fractions
 elseif size(p.Results.samp_frac_lims,2)==2 
 sample_frac_vec=linspace(p.Results.samp_frac_lims(1),...
     p.Results.samp_frac_lims(2),p.Results.num_samp_frac)';
 %if the lims are a scalar then just do one fraction
-elseif isscalar(p.Results.samp_frac_lims)
-    sample_frac_vec=p.Results.samp_frac_lims;
+
 end
 %overwrite plots if only samplign at one fraction of the data
 %if size(sample_frac_vec,1)==1
@@ -159,13 +167,14 @@ end
  fprintf('\n')
  
 out=[];
+% apply the correction for the central moment
 unbias_factor=(repeat_samp./(repeat_samp-1));
 unbias_moments_sub= moments_sub.*repmat(unbias_factor,1,size(moments_sub,2));
 %unbiased sample variance for the results of each bootstrap of a given size:
 unbias_samp_var=unbias_moments_sub(:,1);
 % biased sample standard deviation
-%TODO calulate unbiased sample standard deviation (correcting for sqrt bias)
 std_est_subsamp=sqrt(unbias_samp_var); 
+
 % baised sample standard error for each bootstrap size
 ste_est_subsamp=std_est_subsamp./sqrt(repeat_samp);
 
@@ -175,6 +184,13 @@ ste_est_subsamp=std_est_subsamp./sqrt(repeat_samp);
 mean_like_scaling_factor=sqrt(sample_num_vec)./sqrt(n_total);
 est_se_opp=std_est_subsamp.*mean_like_scaling_factor;
 
+%% unbiasing normaly distributed data
+% correct for the bias of the std https://en.wikipedia.org/wiki/Unbiased_estimation_of_standard_deviation
+% assumes that the dat is normaly distributed
+unbias_normal_std_est_subsamp=std_est_subsamp./normal_correction_c4(repeat_samp);
+ste_est_subsamp_normunbias=unbias_normal_std_est_subsamp./sqrt(repeat_samp);
+est_se_opp_norm_unbias=unbias_normal_std_est_subsamp.*mean_like_scaling_factor;
+
 %now we wish to give our best guess on what the standard error on the whole dataset will be
 % as a first guess we could take the mean across sampling fraction
 est_se_opp_mean_unweighted=nanmean(est_se_opp);
@@ -182,7 +198,8 @@ est_se_opp_mean_unweighted=nanmean(est_se_opp);
 est_std_opp_se_unweighted= std(est_se_opp);
 est_se_opp_se_unweighted=est_std_opp_se_unweighted./sqrt(numel(est_se_opp));
 
-%% weighted SE(fun(data)),SE(SE(fun(data)))
+%% finding the standard devitation for the estimated standard deviation in the whole dataset
+% weighted SE(fun(data)),SE(SE(fun(data)))
 % we could weight each estimated value, to do that we need some way of estimating what the expected standard deviation
 % is for estimating the standard deviaiton in each subsample
 % TODO come up with reasonable estimate of the se in the sample std
@@ -190,19 +207,22 @@ est_se_opp_se_unweighted=est_std_opp_se_unweighted./sqrt(numel(est_se_opp));
 
 
 % if we assume normality then things are pretty easy
-var_samp_var_norm=2*(std_est_subsamp.^4)/(repeat_samp-1);
+%var_samp_var_norm=2*(std_est_subsamp.^4)/(repeat_samp-1);
 % now we will do a crude aproximation and propagate this as var[s^2] to std(sigma)
 %using a=b^(1/2) sigma(a)=(1/2)*sigma(b)*b^(-1/2)  sigma(a)=(1/2)*sigma(b)/a
-se_samp_std_norm=(1/2)*sqrt(var_samp_var_norm)./std_est_subsamp;
-se_samp_std_norm=se_samp_std_norm;
-std_se_opp_norm=se_samp_std_norm*mean_like_scaling_factor;
+%se_samp_std_norm_approx=(1/2)*sqrt(var_samp_var_norm)./std_est_subsamp;
+%std_se_opp_norm_approx=se_samp_std_norm_approx*mean_like_scaling_factor;
+
 % to do this properly we could do a change of variables on the chi-squared distribution
 %https://en.wikipedia.org/wiki/Probability_density_function#Dependent_variables_and_change_of_variables
+% see the mathematica notebook in the derivation folder
+% this results in an expected standard deviation in the sample estimated
+% standard deviation of sigma* Sqrt[1 - c4^2]
+se_samp_std_norm=unbias_normal_std_est_subsamp.*sqrt(1-normal_correction_c4(repeat_samp).^2);
+std_se_opp_norm=se_samp_std_norm.*mean_like_scaling_factor;
 
 % lets now find the weighted values of the predicted SE values
-weights=1./(std_se_opp_norm.^2);
-% and the asociated error
-[est_se_opp_se_weighted_norm,est_se_opp_mean_weighted_norm]=sewm(est_se_opp,weights);
+[est_se_opp_mean_weighted_norm,est_se_opp_se_weighted_norm]=unc_wmean(unbias_normal_std_est_subsamp,std_se_opp_norm);
 
 
 % if we do not assume normality
@@ -212,15 +232,10 @@ se_samp_std_arb=(1/2).*sqrt(var_samp_var_arb)./std_est_subsamp;
 std_se_opp_arb=se_samp_std_arb.*mean_like_scaling_factor;
 % this seems to do very well in my tests
 
-std_se_opp_plot=std_se_opp_arb;
+% and then compute the weighted mean
+[est_se_opp_mean_weighted_arb,est_se_opp_se_weighted_arb]=unc_wmean(est_se_opp,std_se_opp_arb);
 
-% lets now find the weighted values of the predicted SE values
-weights=1./(std_se_opp_arb.^2);
-% and the asociated error
-[est_se_opp_se_weighted_arb,est_se_opp_mean_weighted_arb]=sewm(est_se_opp,weights);
 
-% in my tests i have found that all these options to estimate the output error are underestimates of ~3x 
-% perhaps it is something like a finite sample correction that i have not included
 
 %% save some outputs
 % two outputs one out.sampling that gives the details of the sampling process
@@ -229,11 +244,17 @@ weights=1./(std_se_opp_arb.^2);
 
 out.sampling.moments_sub=moments_sub;
 out.sampling.mean=mean_sub;
-out.sampling.ste=ste_est_subsamp;
 out.sampling.std=std_est_subsamp;
+out.sampling.ste=ste_est_subsamp;
+
+out.sampling.std_norm_unbias=unbias_normal_std_est_subsamp;
+out.sampling.ste_norm_unbias=ste_est_subsamp_normunbias;
+
 out.sampling.se_std_norm=se_samp_std_norm;
 out.sampling.se_std_arb=se_samp_std_arb;
 out.sampling.projected_whole_se=est_se_opp;
+out.sampling.projected_whole_se_norm_unbias=est_se_opp_norm_unbias;
+
 out.sampling.std_projected_whole_se_norm=std_se_opp_norm;
 out.sampling.std_projected_whole_se_arb=std_se_opp_arb;
 out.sampling.sample_repeats=repeat_samp;
@@ -272,7 +293,7 @@ end
 
 
 %% try to fit the dependence of mean est fun (subset) so that we can estimate the bias with sample size
-if do_mean_fit
+if do_mean_fit && numel(sample_frac_vec)>1
     modelfun=@(b,x) b(1)+b(2).*x;
     weights=1./(out.sampling.ste.^2);
     weights=weights./sum(weights);
@@ -295,7 +316,7 @@ if do_mean_fit
     end
 end
 
-if do_plots
+if do_plots && numel(sample_frac_vec)>1
     if isempty(p.Results.plot_fig_name) || isequal(p.Results.plot_fig_name,'')
         stfig('bootstrap results','add_stack',1);
     else
@@ -304,8 +325,8 @@ if do_plots
     clf
     subplot(2,1,1)
     errorbar(out.sampling.sample_size,out.sampling.projected_whole_se,...
-    std_se_opp_plot,'ko',...
-    'CapSize',0,...
+    out.sampling.std_projected_whole_se_arb,'ko',...
+    'CapSize',3,...
     'MarkerSize',6,...
     'LineWidth',1.5,...
     'MarkerEdgeColor','k',...
@@ -313,12 +334,20 @@ if do_plots
     hold on
     xl=xlim(gca);
     
-
+    errorbar(out.sampling.sample_size,out.sampling.projected_whole_se_norm_unbias,...
+    out.sampling.std_projected_whole_se_norm,'ro',...
+    'CapSize',3,...
+    'MarkerSize',6,...
+    'LineWidth',1.5,...
+    'MarkerEdgeColor','r',...
+    'MarkerFaceColor',[1,0,0]*0.3);
+    
+    %
     
     line(xl,[1,1]*est_se_opp_mean_unweighted,'Color','k','LineWidth',2)
     line(xl,[1,1]*(est_se_opp_mean_unweighted-est_std_opp_se_unweighted),'Color','m','LineWidth',2)
     line(xl,[1,1]*(est_se_opp_mean_unweighted+est_std_opp_se_unweighted),'Color','m','LineWidth',2)
-    legends={'Est SE','mean Est SE','+std Est SE','-std Est SE'};
+    legends={'Est SE','Est SE normality','mean Est SE','+std Est SE','-std Est SE'};
     if ~isnan(p.Results.true_dist_se)
         legends=[legends,'true dist SE'];
         line(xl,[1,1]*p.Results.true_dist_se,'Color','r','LineWidth',2)
@@ -345,12 +374,20 @@ if do_plots
 
     subplot(2,1,2)
     errorbar(out.sampling.sample_size,out.sampling.mean,out.sampling.ste,'ko',...
-    'CapSize',0,...
+    'CapSize',3,...
     'MarkerSize',6,...
     'LineWidth',1.5,...
     'MarkerEdgeColor','k',...
     'MarkerFaceColor',[1,1,1]*0.3)
     hold on
+
+    errorbar(out.sampling.sample_size,out.sampling.mean,out.sampling.ste_norm_unbias,'ro',...
+    'CapSize',3,...
+    'MarkerSize',6,...
+    'LineWidth',1.5,...
+    'MarkerEdgeColor','r',...
+    'MarkerFaceColor',[1,0,0]*0.3)
+
     xlabel(sprintf('subsample size (whole data set =%u, vert line)',n_total))
     ylabel('mean est fun of subsample')
     legends={'Est mean'};
