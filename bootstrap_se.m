@@ -85,8 +85,8 @@ end
 n_total=numel(data);
 sample_num_vec=floor(sample_frac_vec*n_total);
 sample_frac_vec=sample_num_vec/n_total;
-%cull anything below min_frac or min_num
-mask=sample_num_vec>=min_num & sample_frac_vec>min_frac;
+%cull anything below min_num
+mask=sample_num_vec>=min_num;
 sample_num_vec=sample_num_vec(mask);
 sample_frac_vec=sample_frac_vec(mask);
 iimax=numel(sample_frac_vec);
@@ -390,7 +390,7 @@ if do_plots && numel(sample_frac_vec)>1
 
     xlabel(sprintf('subsample size (whole data set =%u, vert line)',n_total))
     ylabel('mean est fun of subsample')
-    legends={'Est mean'};
+    legends={'Est mean','Est mean normality'};
     if do_mean_fit
         x_plot_fit=col_vec(linspace(min(out.sampling.sample_size),max(out.sampling.sample_size),1e4));
         [y_plot_fit_val,y_plot_fit_ci]=predict(fitobject,x_plot_fit);
