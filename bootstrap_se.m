@@ -14,6 +14,7 @@ function [out,detailed_data_out]=bootstrap_se(est_fun,data,varargin)
 %     - [x] unbiased std of the estimated std of the distribution assuming normality
 %     - [x] approx std of the estimated std for arb distribution
 %     - [x] c4 unbiasing function
+%   - [ ] multipe output from estimation function and simulanious boostrap
 % Author: Bryce Henson
 % email: Bryce.Henson[the a swirly]live.com you must have
 % '[matlab][bootstrap_error]' in the subject line for me to respond
