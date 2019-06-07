@@ -298,13 +298,12 @@ if do_mean_fit && numel(sample_frac_vec)>1
     %TODO: a model that is asmyptotic to a value
     modelfun=@(b,x) b(1)+b(2).*x;
     weights=1./(out.sampling.ste.^2);
-    weights=weights./sum(weights);
-    beta0=[mean(out.sampling.mean),0];
     not_nan_mask=~isnan(out.sampling.sample_size) & ~isnan(out.sampling.mean) & ~isnan(weights);
-    
     predictor=out.sampling.sample_size(not_nan_mask);
     response=out.sampling.mean(not_nan_mask);
     weights=weights(not_nan_mask);
+    weights=weights./nansum(weights);
+    beta0=[nanmean(response),0];
     cof_names={'offset','grad'};
     opt = statset('TolFun',1e-10,'TolX',1e-10,...
             'MaxIter',1e4,... %1e4
@@ -317,7 +316,7 @@ if do_mean_fit && numel(sample_frac_vec)>1
     %osc_fit.model_coefs(ii,:,:)=[fitparam.Estimate,fitparam.SE];
     sigma_threshold=3;%number of standard deviations away from zero to be signfigant
     is_grad_sig=abs(fitobject.Coefficients.Estimate(2))>fitobject.Coefficients.SE(2)*sigma_threshold;
-    if ~is_grad_sig && verbose>0
+    if is_grad_sig && verbose>0
         warning(['%s: fit to mean result of est fun on data subset \n'...
                 'shows that the gradient with data size is not within %.0f sd of zero \n',...
                 'you may have a biased estimator\n'],mfilename,sigma_threshold)
