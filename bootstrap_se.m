@@ -295,16 +295,21 @@ end
 
 %% try to fit the dependence of mean est fun (subset) so that we can estimate the bias with sample size
 if do_mean_fit && numel(sample_frac_vec)>1
+    %TODO: a model that is asmyptotic to a value
     modelfun=@(b,x) b(1)+b(2).*x;
     weights=1./(out.sampling.ste.^2);
     weights=weights./sum(weights);
-
     beta0=[mean(out.sampling.mean),0];
+    not_nan_mask=~isnan(out.sampling.sample_size) & ~isnan(out.sampling.mean) & ~isnan(weights);
+    
+    predictor=out.sampling.sample_size(not_nan_mask);
+    response=out.sampling.mean(not_nan_mask);
+    weights=weights(not_nan_mask);
     cof_names={'offset','grad'};
     opt = statset('TolFun',1e-10,'TolX',1e-10,...
             'MaxIter',1e4,... %1e4
             'UseParallel',1);
-    fitobject=fitnlm(out.sampling.sample_size,out.sampling.mean,modelfun,beta0,...
+    fitobject=fitnlm(predictor,response,modelfun,beta0,...
         'Weights',weights,'options',opt,...
         'CoefficientNames',cof_names);
     out.est_mean_dep_fit=fitobject;
@@ -313,7 +318,9 @@ if do_mean_fit && numel(sample_frac_vec)>1
     sigma_threshold=3;%number of standard deviations away from zero to be signfigant
     is_grad_sig=abs(fitobject.Coefficients.Estimate(2))>fitobject.Coefficients.SE(2)*sigma_threshold;
     if ~is_grad_sig && verbose>0
-        warning('%s: warning fit to mean of est fun subset shows that the gradient with data size is not within %.0f sd of zero',mfilename,sigma_threshold)
+        warning(['%s: fit to mean result of est fun on data subset \n'...
+                'shows that the gradient with data size is not within %.0f sd of zero \n',...
+                'you may have a biased estimator\n'],mfilename,sigma_threshold)
     end
 end
 
@@ -394,7 +401,7 @@ if do_plots && numel(sample_frac_vec)>1
     legends={'Est mean','Est mean normality'};
     if do_mean_fit
         x_plot_fit=col_vec(linspace(min(out.sampling.sample_size),max(out.sampling.sample_size),1e4));
-        [y_plot_fit_val,y_plot_fit_ci]=predict(fitobject,x_plot_fit);
+        [y_plot_fit_val,y_plot_fit_ci]=predict(fitobject,x_plot_fit,'Prediction','curve');
         plot(x_plot_fit,y_plot_fit_val,'r')
         plot(x_plot_fit,y_plot_fit_ci(:,1),'g')
         plot(x_plot_fit,y_plot_fit_ci(:,2),'g')
