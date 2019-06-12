@@ -48,6 +48,7 @@ contributors welcome! There is a lot to do to build this into a powerful tool. D
 - check estimated SE of the SE estimate by nesting the bootstrapper
 - [x] fix the overestimation of error at small fractions of the dataset
 - [x] error in the error
+- [ ] fit a (laurent series)[https://en.wikipedia.org/wiki/Laurent_series] to the mean and error dependence
 - more Documentation
   - commenting in main function with links
   - organizing the resources in this readme

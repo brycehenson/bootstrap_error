@@ -24,7 +24,7 @@ min_num=5; %minimum data size for resampling
 
 p = inputParser;
 is_lims=@(x) (isequal(size(x),[1,2]) && (isnumeric(x) && x(2)<10 && x(1)>0))...
-        || (isscalar(x) && x<=1 && x>min_frac);
+        || (isscalar(x) && x<=10);
 is_c_logical=@(in) isequal(in,true) || isequal(in,false); %can x be cast as a logical
 addOptional(p,'replace',true,is_c_logical);
 addOptional(p,'num_samp_frac',10,@(x) isnumeric(x) & x>=1);
