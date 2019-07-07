@@ -24,7 +24,7 @@ min_num=5; %minimum data size for resampling
 
 p = inputParser;
 is_lims=@(x) (isequal(size(x),[1,2]) && (isnumeric(x) && x(2)<10 && x(1)>0))...
-        || (isscalar(x) && x<=1 && x>min_frac);
+        || (isscalar(x) && x<=10);
 is_c_logical=@(in) isequal(in,true) || isequal(in,false); %can x be cast as a logical
 addOptional(p,'replace',true,is_c_logical);
 addOptional(p,'num_samp_frac',10,@(x) isnumeric(x) & x>=1);
@@ -295,16 +295,20 @@ end
 
 %% try to fit the dependence of mean est fun (subset) so that we can estimate the bias with sample size
 if do_mean_fit && numel(sample_frac_vec)>1
+    %TODO: a model that is asmyptotic to a value
     modelfun=@(b,x) b(1)+b(2).*x;
     weights=1./(out.sampling.ste.^2);
-    weights=weights./sum(weights);
-
-    beta0=[mean(out.sampling.mean),0];
+    not_nan_mask=~isnan(out.sampling.sample_size) & ~isnan(out.sampling.mean) & ~isnan(weights);
+    predictor=out.sampling.sample_size(not_nan_mask);
+    response=out.sampling.mean(not_nan_mask);
+    weights=weights(not_nan_mask);
+    weights=weights./nansum(weights);
+    beta0=[nanmean(response),0];
     cof_names={'offset','grad'};
     opt = statset('TolFun',1e-10,'TolX',1e-10,...
             'MaxIter',1e4,... %1e4
             'UseParallel',1);
-    fitobject=fitnlm(out.sampling.sample_size,out.sampling.mean,modelfun,beta0,...
+    fitobject=fitnlm(predictor,response,modelfun,beta0,...
         'Weights',weights,'options',opt,...
         'CoefficientNames',cof_names);
     out.est_mean_dep_fit=fitobject;
@@ -312,8 +316,10 @@ if do_mean_fit && numel(sample_frac_vec)>1
     %osc_fit.model_coefs(ii,:,:)=[fitparam.Estimate,fitparam.SE];
     sigma_threshold=3;%number of standard deviations away from zero to be signfigant
     is_grad_sig=abs(fitobject.Coefficients.Estimate(2))>fitobject.Coefficients.SE(2)*sigma_threshold;
-    if ~is_grad_sig && verbose>0
-        warning('%s: warning fit to mean of est fun subset shows that the gradient with data size is not within %.0f sd of zero',mfilename,sigma_threshold)
+    if is_grad_sig && verbose>0
+        warning(['%s: fit to mean result of est fun on data subset \n'...
+                'shows that the gradient with data size is not within %.0f sd of zero \n',...
+                'you may have a biased estimator\n'],mfilename,sigma_threshold)
     end
 end
 
@@ -325,6 +331,9 @@ if do_plots && numel(sample_frac_vec)>1
     end
     clf
     subplot(2,1,1)
+    hold on
+    legends={};
+    
     errorbar(out.sampling.sample_size,out.sampling.projected_whole_se,...
     out.sampling.std_projected_whole_se_arb,'ko',...
     'CapSize',3,...
@@ -332,8 +341,9 @@ if do_plots && numel(sample_frac_vec)>1
     'LineWidth',1.5,...
     'MarkerEdgeColor','k',...
     'MarkerFaceColor',[1,1,1]*0.3);
-    hold on
+    
     xl=xlim(gca);
+     legends{end+1}='Est SE';
     
     errorbar(out.sampling.sample_size,out.sampling.projected_whole_se_norm_unbias,...
     out.sampling.std_projected_whole_se_norm,'ro',...
@@ -342,13 +352,15 @@ if do_plots && numel(sample_frac_vec)>1
     'LineWidth',1.5,...
     'MarkerEdgeColor','r',...
     'MarkerFaceColor',[1,0,0]*0.3);
-    
+     legends{end+1}='Est SE normality';
     %
     
     line(xl,[1,1]*est_se_opp_mean_unweighted,'Color','k','LineWidth',2)
+     legends{end+1}='mean Est SE';
     line(xl,[1,1]*(est_se_opp_mean_unweighted-est_std_opp_se_unweighted),'Color','m','LineWidth',2)
+     legends{end+1}='+std Est SE';
     line(xl,[1,1]*(est_se_opp_mean_unweighted+est_std_opp_se_unweighted),'Color','m','LineWidth',2)
-    legends={'Est SE','Est SE normality','mean Est SE','+std Est SE','-std Est SE'};
+     legends{end+1}='-std Est SE';
     if ~isnan(p.Results.true_dist_se)
         legends=[legends,'true dist SE'];
         line(xl,[1,1]*p.Results.true_dist_se,'Color','r','LineWidth',2)
@@ -357,16 +369,16 @@ if do_plots && numel(sample_frac_vec)>1
         legends=[legends,'true Samp SE'];
         line(xl,[1,1]*p.Results.true_samp_se,'Color','b','LineWidth',2)
     end
-    
-    
     if max(xl)>=n_total
         yl=ylim(gca);
         line([1,1]*n_total,yl,'Color',[1,1,1]*0.7,'LineWidth',2);
     %bring the point which has all the data on top of the line so that the error bar can be seen
         chi=get(gca, 'Children');
         set(gca, 'Children',flipud(chi))
-        legends=[legends,'total data size'];
+        legends{end+1}='total data size';
+        legends=fliplr(legends);
     end
+    
     legend(legends)
     hold off
     xlabel(sprintf('subsample size (whole data set =%u, vert line)',n_total))
@@ -374,13 +386,16 @@ if do_plots && numel(sample_frac_vec)>1
 
 
     subplot(2,1,2)
+    hold on
+    legends={};
+    legends{end+1}='Est mean';
     errorbar(out.sampling.sample_size,out.sampling.mean,out.sampling.ste,'ko',...
     'CapSize',3,...
     'MarkerSize',6,...
     'LineWidth',1.5,...
     'MarkerEdgeColor','k',...
     'MarkerFaceColor',[1,1,1]*0.3)
-    hold on
+
 
     errorbar(out.sampling.sample_size,out.sampling.mean,out.sampling.ste_norm_unbias,'ro',...
     'CapSize',3,...
@@ -388,17 +403,19 @@ if do_plots && numel(sample_frac_vec)>1
     'LineWidth',1.5,...
     'MarkerEdgeColor','r',...
     'MarkerFaceColor',[1,0,0]*0.3)
-
+    legends{end+1}='Est mean normality';
     xlabel(sprintf('subsample size (whole data set =%u, vert line)',n_total))
     ylabel('mean est fun of subsample')
-    legends={'Est mean','Est mean normality'};
+
     if do_mean_fit
         x_plot_fit=col_vec(linspace(min(out.sampling.sample_size),max(out.sampling.sample_size),1e4));
-        [y_plot_fit_val,y_plot_fit_ci]=predict(fitobject,x_plot_fit);
+        [y_plot_fit_val,y_plot_fit_ci]=predict(fitobject,x_plot_fit,'Prediction','curve','Alpha',1-erf(1/sqrt(2)));
         plot(x_plot_fit,y_plot_fit_val,'r')
+         legends{end+1}='fit';
         plot(x_plot_fit,y_plot_fit_ci(:,1),'g')
+         legends{end+1}='fit+se';
         plot(x_plot_fit,y_plot_fit_ci(:,2),'g')
-        legends=[legends,'fit','fit+ci','fit-ci'];
+         legends{end+1}='fit-se';
     end
     
     
