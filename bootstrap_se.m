@@ -20,7 +20,7 @@ function [out,detailed_data_out]=bootstrap_se(est_fun,data,varargin)
 % '[matlab][bootstrap_error]' in the subject line for me to respond
 % Last revision:2019-06-02
 
-min_num=5; %minimum data size for resampling
+min_sample_num=5; %minimum data size for resampling
 
 p = inputParser;
 is_lims=@(x) (isequal(size(x),[1,2]) && (isnumeric(x) && x(2)<10 && x(1)>0))...
@@ -82,7 +82,7 @@ n_total=numel(data);
 sample_num_vec=floor(sample_frac_vec*n_total);
 sample_frac_vec=sample_num_vec/n_total;
 %cull anything below min_num
-mask=sample_num_vec>=min_num;
+mask=sample_num_vec>=min_sample_num;
 sample_num_vec=sample_num_vec(mask);
 sample_frac_vec=sample_frac_vec(mask);
 iimax=numel(sample_frac_vec);
@@ -96,25 +96,42 @@ if iimax==0
     error('no sample fracions')
 end
 
-%prealocate the moments of the distribution
-mean_sub=NaN(numel(sample_frac_vec),1);
-moments_sub=NaN(numel(sample_frac_vec),3);
-%find the output size of the passed estimator function
+
+%find the output size of the passed estimator function as in function [a,b,c]=function(inputs)
 %should build in optional argument to specify this
-output_size=nargout(est_fun);
+est_fun_output_size=nargout(est_fun);
 %this will only take the first output of an an anonymous function
-if output_size==-1
-    output_size=1;
+if est_fun_output_size==-1
+    est_fun_output_size=1;
 end
 
 out_cell=cell(iimax,repeat_samp_prefactor);
 in_cell=out_cell;
-out_cell_tmp=cell(1,output_size);
-if output_size>1 && save_multi_out
-    multi_out=true;
+out_cell_tmp=cell(1,est_fun_output_size);
+if est_fun_output_size>1 && save_multi_out
+    est_fun_multi_out=true;
 else
-    multi_out=false;
+    est_fun_multi_out=false;
 end
+
+%% find the size of the scalar output by calling the estimation function once
+data_smpl=randsample(data,min_sample_num,do_replace);
+if est_fun_multi_out
+    [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
+    out_val_tmp=out_cell_tmp{1};
+else
+    out_val_tmp=est_fun(data_smpl,opp_arguments{:});
+end 
+if ~isvector(out_val_tmp)
+    erro('first output of function is not a scalar or vector')
+end
+out_val_tmp=col_vec(out_val_tmp);
+output_val_size=numel(out_val_tmp);
+%%
+%prealocate the moments of the distribution
+mean_sub=NaN(numel(sample_frac_vec),output_val_size);
+moments_sub=NaN(numel(sample_frac_vec),3,output_val_size);
+
 
 if verbose>0
     fprintf('Bootstrapping with different sample fractions %04u:%04u',0)
@@ -124,7 +141,7 @@ for ii=1:iimax
     %std means nothing for n<3
     %the finte sample correaction for the no replacements method breaks when n_sample=ntot
     if n_sample>3 && (n_sample<n_total || do_replace)
-        est_fun_res_sub=NaN(repeat_samp(ii),1); %the results of the estimation function
+        est_fun_res_sub=NaN(repeat_samp(ii),output_val_size); %the results of the estimation function
         if do_replace
             finite_pop_corr=1;
         else
@@ -136,27 +153,36 @@ for ii=1:iimax
             %then we assign the output of the est_fun on the data_smp to est_fun_res_sub
             %matalb cant do [out_cell_tmp{:}]=scalar so a case statement
             %is needed
-            if multi_out
+            if est_fun_multi_out
                 [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
-                est_fun_res_sub(jj)=out_cell_tmp{1};
+                out_val_tmp=col_vec(out_cell_tmp{1});
+                if numel(out_val_tmp)~=output_val_size
+                    error('output size wrong')
+                end
+                est_fun_res_sub(jj,:)=out_val_tmp;
                 out_cell{ii,jj}=out_cell_tmp{2:end};
             else
-                est_fun_res_sub(jj)=est_fun(data_smpl,opp_arguments{:});
+                out_val_tmp=est_fun(data_smpl,opp_arguments{:});
+                out_val_tmp=col_vec(out_val_tmp);
+                if numel(out_val_tmp)~=output_val_size
+                    error('output size wrong')
+                end
+                est_fun_res_sub(jj,:)=out_val_tmp;
             end 
             if save_input_data
                 in_cell{ii,jj}=data_smpl;
             end
         end
         % calculate statistics on the results with a given sample size
-        mean_sub(ii)=mean(est_fun_res_sub);
+        mean_sub(ii,:)=mean(est_fun_res_sub,1);
         % biased sample variance of the subset
-        moments_sub(ii,1)=moment(est_fun_res_sub,2);
-        moments_sub(ii,2)=moment(est_fun_res_sub,3);
-        moments_sub(ii,3)=moment(est_fun_res_sub,4);
+        moments_sub(ii,1,:)=moment(est_fun_res_sub,2,1);
+        moments_sub(ii,2,:)=moment(est_fun_res_sub,3,1);
+        moments_sub(ii,3,:)=moment(est_fun_res_sub,4,1);
 
         %use finte population correction to estimate the population std using sampling without
         %replacements, if do_replace finite_pop_corr=1
-        moments_sub(ii,1)=moments_sub(ii,1)/finite_pop_corr;
+        moments_sub(ii,1,:)=moments_sub(ii,1)/finite_pop_corr;
     end
     if verbose>0, fprintf('\b\b\b\b%04u',ii), end
 end
