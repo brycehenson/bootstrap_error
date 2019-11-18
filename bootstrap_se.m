@@ -101,9 +101,6 @@ if iimax==0
     error('no sample fracions')
 end
 
-%prealocate the moments of the distribution
-mean_sub=NaN(numel(sample_frac_vec),1);
-moments_sub=NaN(numel(sample_frac_vec),3);
 %find the output size of the passed estimator function
 %should build in optional argument to specify this
 output_size=nargout(est_fun);
@@ -111,6 +108,12 @@ output_size=nargout(est_fun);
 if output_size==-1
     output_size=1;
 end
+
+%prealocate the moments of the distribution
+mean_sub=NaN(numel(sample_frac_vec),output_size);
+moments_sub_2=NaN(numel(sample_frac_vec),output_size);
+moments_sub_3=NaN(numel(sample_frac_vec),output_size);
+moments_sub_4=NaN(numel(sample_frac_vec),output_size);
 
 out_cell=cell(iimax,repeat_samp_prefactor);
 in_cell=out_cell;
@@ -129,7 +132,7 @@ for ii=1:iimax
     %std means nothing for n<3
     %the finte sample correaction for the no replacements method breaks when n_sample=ntot
     if n_sample>3 && (n_sample<n_total || do_replace)
-        est_fun_res_sub=NaN(repeat_samp(ii),1); %the results of the estimation function
+        est_fun_res_sub=NaN(repeat_samp(ii),output_size); %the results of the estimation function
         if do_replace
             finite_pop_corr=1;
         else
@@ -143,7 +146,7 @@ for ii=1:iimax
             %is needed
             if multi_out
                 [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
-                est_fun_res_sub(jj)=out_cell_tmp{1};
+                est_fun_res_sub(jj,:)=cell2mat(out_cell_tmp);
                 out_cell{ii,jj}=out_cell_tmp{2:end};
             else
                 est_fun_res_sub(jj)=est_fun(data_smpl,opp_arguments{:});
@@ -153,15 +156,15 @@ for ii=1:iimax
             end
         end
         % calculate statistics on the results with a given sample size
-        mean_sub(ii)=mean(est_fun_res_sub);
+        mean_sub(ii,:)=mean(est_fun_res_sub);
         % biased sample variance of the subset
-        moments_sub(ii,1)=moment(est_fun_res_sub,2);
-        moments_sub(ii,2)=moment(est_fun_res_sub,3);
-        moments_sub(ii,3)=moment(est_fun_res_sub,4);
+        moments_sub_2(ii,:)=moment(est_fun_res_sub,2);
+        moments_sub_3(ii,:)=moment(est_fun_res_sub,3);
+        moments_sub_4(ii,:)=moment(est_fun_res_sub,4);
 
         %use finte population correction to estimate the population std using sampling without
         %replacements, if do_replace finite_pop_corr=1
-        moments_sub(ii,1)=moments_sub(ii,1)/finite_pop_corr;
+        moments_sub_2(ii,:)=moments_sub_2(ii,:)./finite_pop_corr;
     end
     if verbose>0, fprintf('\b\b\b\b%04u',ii), end
 end
@@ -170,9 +173,10 @@ end
 out=[];
 % apply the correction for the central moment
 unbias_factor=(repeat_samp./(repeat_samp-1));
-unbias_moments_sub= moments_sub.*repmat(unbias_factor,1,size(moments_sub,2));
+unbias_moments_sub_2= moments_sub_2.*repmat(unbias_factor,1,size(moments_sub_2,2));
+unbias_moments_sub_4= moments_sub_4.*repmat(unbias_factor,1,size(moments_sub_4,2));
 %unbiased sample variance for the results of each bootstrap of a given size:
-unbias_samp_var=unbias_moments_sub(:,1);
+unbias_samp_var=unbias_moments_sub_2(:,:);
 % biased sample standard deviation
 std_est_subsamp=sqrt(unbias_samp_var); 
 
@@ -228,7 +232,7 @@ std_se_opp_norm=se_samp_std_norm.*mean_like_scaling_factor;
 
 % if we do not assume normality
 % we can use 4th centeral (unbiased) moment over the subsamples 
-var_samp_var_arb=(1./repeat_samp).*(unbias_moments_sub(:,3)-(std_est_subsamp.^4).*((repeat_samp-3)./(repeat_samp-1)));
+var_samp_var_arb=(1./repeat_samp).*(unbias_moments_sub_4(:,:)-(std_est_subsamp.^4).*((repeat_samp-3)./(repeat_samp-1)));
 se_samp_std_arb=(1/2).*sqrt(var_samp_var_arb)./std_est_subsamp;
 std_se_opp_arb=se_samp_std_arb.*mean_like_scaling_factor;
 % this seems to do very well in my tests
@@ -243,7 +247,7 @@ std_se_opp_arb=se_samp_std_arb.*mean_like_scaling_factor;
 % the second out.result will contain the useful results est se in full anal ect
 % the main output will be 
 
-out.sampling.moments_sub=moments_sub;
+out.sampling.moments_sub=moments_sub_2;
 out.sampling.mean=mean_sub;
 out.sampling.std=std_est_subsamp;
 out.sampling.ste=ste_est_subsamp;
@@ -299,27 +303,30 @@ if do_mean_fit && numel(sample_frac_vec)>1
     modelfun=@(b,x) b(1)+b(2).*x;
     weights=1./(out.sampling.ste.^2);
     not_nan_mask=~isnan(out.sampling.sample_size) & ~isnan(out.sampling.mean) & ~isnan(weights);
-    predictor=out.sampling.sample_size(not_nan_mask);
-    response=out.sampling.mean(not_nan_mask);
-    weights=weights(not_nan_mask);
+    not_nan_mask=all(not_nan_mask,2);
+    predictor=out.sampling.sample_size(not_nan_mask,:);
+    response=out.sampling.mean(not_nan_mask,:);
+    weights=weights(not_nan_mask,:);
     weights=weights./nansum(weights);
-    beta0=[nanmean(response),0];
     cof_names={'offset','grad'};
     opt = statset('TolFun',1e-10,'TolX',1e-10,...
-            'MaxIter',1e4,... %1e4
-            'UseParallel',1);
-    fitobject=fitnlm(predictor,response,modelfun,beta0,...
-        'Weights',weights,'options',opt,...
-        'CoefficientNames',cof_names);
-    out.est_mean_dep_fit=fitobject;
-    %%itparam=fitobject.Coefficients;
-    %osc_fit.model_coefs(ii,:,:)=[fitparam.Estimate,fitparam.SE];
-    sigma_threshold=3;%number of standard deviations away from zero to be signfigant
-    is_grad_sig=abs(fitobject.Coefficients.Estimate(2))>fitobject.Coefficients.SE(2)*sigma_threshold;
-    if is_grad_sig && verbose>0
-        warning(['%s: fit to mean result of est fun on data subset \n'...
+        'MaxIter',1e4,... %1e4
+        'UseParallel',1);
+    for jj= 1:size(response,2)
+        beta0=[nanmean(response(:,jj)),0];
+        fitobject=fitnlm(predictor,response(:,jj),modelfun,beta0,...
+            'Weights',weights(:,jj),'options',opt,...
+            'CoefficientNames',cof_names);
+        out.est_mean_dep_fit{jj}=fitobject;
+        %%itparam=fitobject.Coefficients;
+        %osc_fit.model_coefs(ii,:,:)=[fitparam.Estimate,fitparam.SE];
+        sigma_threshold=3;%number of standard deviations away from zero to be signfigant
+        is_grad_sig=abs(fitobject.Coefficients.Estimate(2))>fitobject.Coefficients.SE(2)*sigma_threshold;
+        if is_grad_sig && verbose>0
+            warning(['%s: fit to mean result of est fun on data subset \n'...
                 'shows that the gradient with data size is not within %.0f sd of zero \n',...
                 'you may have a biased estimator\n'],mfilename,sigma_threshold)
+        end
     end
 end
 
