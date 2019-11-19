@@ -16,8 +16,10 @@ The procedure is reasonably simple given some analysis operation (estimation fun
 
 
 As a test it is advisable to check that there is no trend in the estimated standard error as function of the size of the subset. Thus the above procedure may be repeated at many different fractions of the whole dataset giving the graph below. 
-![fig1](/fig1.png)
-This graph can be used to reveal the bias of the estimation function with sample size and how the error in the result scales with sample size. An estimation function is mean-like if the estimated SE in the operation on the whole data set does not change with subsample fraction.
+
+| ![Figure 1](/figs/fig1.png "Fig1") | 
+|:--:| 
+ **Figure 1**- Bias analysis output. This graph can be used to reveal the bias of the estimation function with sample size and how the error in the result scales with sample size. An estimation function is mean-like if the estimated SE in the operation on the whole data set does not change with subsample fraction. |
 
 
 ## Features
@@ -65,6 +67,7 @@ contributors welcome! There is a lot to do to build this into a powerful tool. D
   - [x] build nested bootstrap
   - [ ] undestand why results are wrong
   - [ ] understand how should treat combining multiple sampling fractions
+- [ ] add to matlab file exchange
   
   
  
