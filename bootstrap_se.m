@@ -1,4 +1,4 @@
-function [out,detailed_data_out]=bootstrap_se(est_fun,data,varargin)
+function [out,detailed_data_out]=bootstrap_se(est_fun_in,data,varargin)
 %funciton calculates the standard error of performing est_fun(data)
 %data is a vector of cells or scalars
 
@@ -43,6 +43,7 @@ addOptional(p,'plot_fig_name','',@ischar);
 addOptional(p,'do_mean_fit',1,is_c_logical)
 addOptional(p,'use_weighting',true,is_c_logical)
 addOptional(p,'norm_weighting',false,is_c_logical)
+addOptional(p,'use_frac_size',false,is_c_logical)
 parse(p,varargin{:});
 
 do_mean_fit=p.Results.do_mean_fit;
@@ -51,6 +52,7 @@ do_replace=coerce_logical(p.Results.replace);
 use_mean_se_for_se_se=coerce_logical(p.Results.mean_se_for_se_se);
 use_weighting=coerce_logical(p.Results.use_weighting);
 norm_weighting=coerce_logical(p.Results.norm_weighting);
+use_frac=coerce_logical(p.Results.use_frac_size); %do we want to use the fractional method
 
 if use_mean_se_for_se_se
     warning('mean_se_for_se_se is depricated')
@@ -99,7 +101,7 @@ end
 
 %find the output size of the passed estimator function as in function [a,b,c]=function(inputs)
 %should build in optional argument to specify this
-est_fun_output_size=nargout(est_fun);
+est_fun_output_size=nargout(est_fun_in);
 %this will only take the first output of an an anonymous function
 if est_fun_output_size==-1
     est_fun_output_size=1;
@@ -114,24 +116,11 @@ else
     est_fun_multi_out=false;
 end
 
-%% find the size of the scalar output by calling the estimation function once
-data_smpl=randsample(data,min_sample_num,do_replace);
-if est_fun_multi_out
-    [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
-    out_val_tmp=out_cell_tmp{1};
+if use_frac 
+    est_fun =  @(data,opts) est_fun_in(data,1,opts);
 else
-    out_val_tmp=est_fun(data_smpl,opp_arguments{:});
-end 
-if ~isvector(out_val_tmp)
-    error('first output of function is not a scalar or vector')
+    est_fun =  est_fun_in;
 end
-out_val_tmp=col_vec(out_val_tmp);
-output_val_size=numel(out_val_tmp);
-%%
-%prealocate the moments of the distribution
-mean_sub=NaN(numel(sample_frac_vec),output_val_size);
-moments_sub=NaN(numel(sample_frac_vec),3,output_val_size);
-
 
 %% find the size of the scalar output by calling the estimation function once
 data_smpl=randsample(data,min_sample_num,do_replace);
@@ -157,9 +146,10 @@ if verbose>0
 end
 for ii=1:iimax
     n_sample=sample_num_vec(ii);
+    frac_sample=sample_frac_vec(ii);
     %std means nothing for n<3
     %the finte sample correaction for the no replacements method breaks when n_sample=ntot
-    if n_sample>3 && (n_sample<n_total || do_replace)
+    if (n_sample>3 && (n_sample<n_total || do_replace)) || (use_frac && frac_sample<=1.0)
         est_fun_res_sub=NaN(repeat_samp(ii),output_val_size); %the results of the estimation function
         if do_replace
             finite_pop_corr=1;
@@ -168,12 +158,18 @@ for ii=1:iimax
         end 
         for jj=1:repeat_samp(ii)
             %calculate the analysis operation on the subset of dat
-            data_smpl=randsample(data,n_sample,do_replace);
+            if ~use_frac
+                data_smpl=randsample(data,n_sample,do_replace);
+            end
             %then we assign the output of the est_fun on the data_smp to est_fun_res_sub
             %matalb cant do [out_cell_tmp{:}]=scalar so a case statement
             %is needed
             if est_fun_multi_out
-                [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
+                if use_frac
+                    [out_cell_tmp{:}]=est_fun(data_smpl,frac_sample,opp_arguments{:});
+                else
+                    [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
+                end
                 out_val_tmp=col_vec(out_cell_tmp{1});
                 if numel(out_val_tmp)~=output_val_size
                     error('output size wrong')
@@ -181,7 +177,11 @@ for ii=1:iimax
                 est_fun_res_sub(jj,:)=out_val_tmp;
                 out_cell{ii,jj}=out_cell_tmp{2:end};
             else
-                out_val_tmp=est_fun(data_smpl,opp_arguments{:});
+                if use_frac
+                    out_val_tmp=est_fun(data_smpl,frac_sample,opp_arguments{:});
+                else
+                    out_val_tmp=est_fun(data_smpl,opp_arguments{:});
+                end
                 out_val_tmp=col_vec(out_val_tmp);
                 if numel(out_val_tmp)~=output_val_size
                     error('output size wrong')
