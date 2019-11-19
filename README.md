@@ -67,6 +67,7 @@ contributors welcome! There is a lot to do to build this into a powerful tool. D
   - [x] build nested bootstrap
   - [ ] undestand why results are wrong
   - [ ] understand how should treat combining multiple sampling fractions
+- [ ] make a nice logo/diagram
 - [ ] add to matlab file exchange
   
   
