@@ -44,21 +44,30 @@ If you are studying the error from some analysis operation then it may be requir
 
 ## To Do
 contributors welcome! There is a lot to do to build this into a powerful tool. Drop me an email. 
+- [ ] allow for vctor output of function, producing the estimated error for each element of the vector
+- [ ] add an option to let the estimator function handle the subsampling
 - build convergence test for some distributions (normal,uniform,(arb. kurtosis)[https://en.wikipedia.org/wiki/Kurtosis#The_Pearson_type_VII_family]
 - check estimated SE of the SE estimate by nesting the bootstrapper
 - [x] fix the overestimation of error at small fractions of the dataset
 - [x] error in the error
 - [ ] fit a (laurent series)[https://en.wikipedia.org/wiki/Laurent_series] to the mean and error dependence
-- more Documentation
-  - commenting in main function with links
-  - organizing the resources in this readme
+- [ ] more Documentation
+  - [ ] commenting in main function with links
+  - [ ] organizing the resources in this readme
 - [x] allow second output from anal_opp function (to be used as a structure of details about the fit)
   - allow for this second output not to be provided
   - provide all these second outputs in a cell matrix
-- write tutorial in more detail
-- normalily testing
+- [ ] write tutorial in more detail
+- [ ] normalily testing
   - during the bootstrap try and determine if the underlying distribution is normal or not
   - (package)[https://au.mathworks.com/matlabcentral/fileexchange/60147-normality-test-package]
+- [ ] error in the error
+  - [x] build nested bootstrap
+  - [ ] undestand why results are wrong
+  - [ ] understand how should treat combining multiple sampling fractions
+  
+  
+ 
 
 
 
