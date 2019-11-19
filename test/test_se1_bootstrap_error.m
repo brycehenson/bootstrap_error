@@ -30,57 +30,62 @@ dist_sample_res(ii)=anal_opp(data);
 end
 mc_samp_se=std(dist_sample_res);
 
-LogicalStr = {'FAIL','pass'};
+logical_str = {'FAIL','pass'};
 test_tol=0.1;
 is_analysic_se_right= (abs(diff([mc_samp_se,analytic_dist_ste]))/...
     mean([mc_samp_se,analytic_samp_se]))<test_tol;
 fprintf('INFO: analytic SE = %.3f\n',analytic_dist_ste)
 fprintf('INFO: MC SE       = %.3f\n',mc_samp_se)
-fprintf('TEST: analytic = MC standard error   ±%.0f%% :%s \n',test_tol*1e2,LogicalStr{is_analysic_se_right+1})
+fprintf('TEST: analytic = MC standard error   ±%.0f%% :%s \n',test_tol*1e2,logical_str{is_analysic_se_right+1})
 
 %%
 
 
-fignum=10;
+
 boot=bootstrap_se(anal_opp,data,...
     'plots',true,...
     'replace',false,...
-    'samp_frac_lims',[0.005,0.9],...
-    'num_samp_frac',1e2,...
-    'num_samp_rep',1e2,...
-    'plot_fig_num',fignum,...
+    'samp_frac_lims',[0.005,0.95],...
+    'num_samp_frac',1e3,...
+    'num_samp_rep',1e1,...
+    'plot_fig_name','test_se1',...
     'true_dist_se',analytic_dist_ste,...
     'true_samp_se',analytic_samp_se,...
     'mean_se_for_se_se',0);
 
 test_tol=0.1;
-is_boot_right= (abs(diff([boot.se_opp,analytic_dist_ste]))/...
-    mean([boot.se_opp,analytic_dist_ste]))<test_tol;
-fprintf('INFO: boot SE     = %.3f\n',boot.se_opp)
-fprintf('TEST: boot = analytic standard error ±%.0f%% :%s \n',test_tol*1e2,LogicalStr{is_analysic_se_right+1})
+is_boot_right= frac_diff(boot.results.se_fun_whole,analytic_dist_ste)<test_tol;
+fprintf('INFO: boot SE     = %.3f\n',boot.results.se_fun_whole)
+fprintf('TEST: boot = analytic standard error ±%.0f%% :%s \n',test_tol*1e2,logical_str{is_boot_right+1})
 
-
-%%
+%
 %see if bootstrap SE is within a few of the estimated SE in the SE from the
 %analytic value for the SE
 test_tol=3;
-is_boot_within_se= abs(diff([boot.se_opp,analytic_dist_ste]))<boot.std_se_opp*test_tol;
-fprintf('INFO: boot (sample frac) std SE = %.1e\n', boot.std_se_opp_unweighted)
-fprintf('INFO: boot (estimated) std SE   = %.1e\n', boot.std_se_opp)
-fprintf('INFO: boot- analytic SE         = %.1e\n', diff([boot.se_opp,analytic_dist_ste]))
-fprintf('INFO: (boot- analytic SE)/(sample frac) std SE    = %.1g\n', diff([boot.se_opp,analytic_dist_ste])/boot.std_se_opp_unweighted)
-fprintf('INFO: (boot- analytic SE)/estimated) std SE       = %.1g\n', diff([boot.se_opp,analytic_dist_ste])/boot.std_se_opp)
-fprintf('TEST: boot = analytic standard error w/in %.0f (est)std :%s \n',test_tol,LogicalStr{is_boot_within_se+1})
+
+fprintf('INFO: boot (sample frac) SE in SE = %.1e\n', boot.results.se_se_fun_whole_unweighted)
+fprintf('INFO: boot (estimated) SE in SE   = %.1e\n', boot.results.se_se_fun_whole_weighted_norm)
+fprintf('INFO: boot- analytic SE         = %.1e\n', diff([boot.results.se_fun_whole,analytic_dist_ste]))
+fprintf('INFO: (boot- analytic SE)/(sample frac) std SE    = %.1g\n', diff([boot.results.se_fun_whole,analytic_dist_ste])/boot.results.se_se_fun_whole_unweighted)
+is_boot_within_se= abs(diff([boot.results.se_fun_whole,analytic_dist_ste]))<boot.results.se_se_fun_whole*test_tol;
+fprintf('TEST: boot = analytic standard error w/in %.0f (est)std :%s \n',test_tol,logical_str{is_boot_within_se+1})
+fprintf('INFO: (boot- analytic SE)/estimated) std SE       = %.1g\n', diff([boot.results.se_fun_whole,analytic_dist_ste])/boot.results.se_se_fun_whole_weighted_norm)
+is_boot_within_se= abs(diff([boot.results.se_fun_whole,analytic_dist_ste]))<boot.results.se_se_fun_whole_weighted_norm*test_tol;
+fprintf('TEST: boot = analytic standard error w/in %.0f (est)std :%s \n',test_tol,logical_str{is_boot_within_se+1})
 
 %%
-
+% for each sample faction find the number of se that the predicted se in the total was different from the mean across
+% sample fractions, normalized by the estimated se in the se from that sample fraction
 %histogram the residuals to see if the moemnt based error is roughly correct
-sfigure(2);
+%
+stfig('error histogram');
 subplot(2,1,1)
-hist(abs((boot.se_opp-boot.opp_frac_est_se(:,2))./boot.std_se_opp),1e2)
-xlabel('number std (measured from moments)')
+hist((boot.sampling.projected_whole_se_norm_unbias-mean(boot.sampling.projected_whole_se_norm_unbias))./(boot.sampling.std_projected_whole_se_norm),1e2)
+xlabel('number std (projected se for sample fraction - mean se)')
 ylabel('counts')
+title('normal distribution correction')
 subplot(2,1,2)
+hist((boot.sampling.std_projected_whole_se_norm-mean(boot.sampling.std_projected_whole_se_norm))./(boot.sampling.std_projected_whole_se_norm),1e2)
 hist(abs((boot.se_opp-boot.opp_frac_est_se(:,2))./boot.std_se_opp_unweighted),1e2)
 xlabel('number std (measured from sample frac)')
 ylabel('counts')

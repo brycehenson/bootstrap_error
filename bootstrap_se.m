@@ -63,17 +63,12 @@ opp_arguments=p.Results.opp_arguments;
 repeat_samp_prefactor=p.Results.num_samp_rep;
 %input taken care of
 
-%if the number of fractions to sample is one
+%if the number of fractions to sample is one take the mean of the limits
 if p.Results.num_samp_frac==1
      sample_frac_vec=mean(p.Results.samp_frac_lims);
-elseif isscalar(p.Results.samp_frac_lims) || p.Results.num_samp_frac==1
-    if size(p.Results.samp_frac_lims,2)==2 
-        warning('sample fraction limits specified but num_sample_fac=1 taking the max sample fraction')
-    end
-    sample_frac_vec=p.Results.samp_frac_lims(end);
-%sample over multiple fractions
+    %sample over multiple fractions
 elseif size(p.Results.samp_frac_lims,2)==2 
-sample_frac_vec=linspace(p.Results.samp_frac_lims(1),...
+    sample_frac_vec=linspace(p.Results.samp_frac_lims(1),...
     p.Results.samp_frac_lims(2),p.Results.num_samp_frac)';
 %if the lims are a scalar then just do one fraction
 
