@@ -1,5 +1,6 @@
 function [mean_val,ste_mean]=unc_wmean(x,unc)
 %TODO:
+% add dimension argument for operating on matricies
 % -standard format
 % -docs, tests
 % - cleaner layout

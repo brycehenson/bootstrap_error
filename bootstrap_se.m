@@ -182,7 +182,7 @@ for ii=1:iimax
 
         %use finte population correction to estimate the population std using sampling without
         %replacements, if do_replace finite_pop_corr=1
-        moments_sub(ii,1,:)=moments_sub(ii,1)/finite_pop_corr;
+        moments_sub(ii,1,:)=moments_sub(ii,1,:)/finite_pop_corr;
     end
     if verbose>0, fprintf('\b\b\b\b%04u',ii), end
 end
@@ -193,32 +193,34 @@ out=[];
 unbias_factor=(repeat_samp./(repeat_samp-1));
 unbias_moments_sub= moments_sub.*repmat(unbias_factor,1,size(moments_sub,2));
 %unbiased sample variance for the results of each bootstrap of a given size:
-unbias_samp_var=unbias_moments_sub(:,1);
+unbias_samp_var=unbias_moments_sub(:,1,:);
+unbias_samp_var=permute(unbias_samp_var,[1,3,2]); % permute the dimensions to get the rid of the singleton dim
 % biased sample standard deviation
 std_est_subsamp=sqrt(unbias_samp_var); 
 
-% baised sample standard error for each bootstrap size
-ste_est_subsamp=std_est_subsamp./sqrt(repeat_samp);
+% baised sample standard error for each bootstrap size size()=[numel(sample_frac_vec), output_val_size]
+ste_est_subsamp=std_est_subsamp./repmat(sqrt(repeat_samp),[1,output_val_size]);
 
-%now calulate the standard error in the anal
+%now calulate the standard error in the anal.
 %operation on the whole datset assuming mean like scaling
 % if this is flat with sample size then the estimator is mean-like (which is good)
 mean_like_scaling_factor=sqrt(sample_num_vec)./sqrt(n_total);
+mean_like_scaling_factor=repmat(mean_like_scaling_factor,[1,output_val_size]);
 est_se_opp=std_est_subsamp.*mean_like_scaling_factor;
 
 %% unbiasing normaly distributed data
 % correct for the bias of the std https://en.wikipedia.org/wiki/Unbiased_estimation_of_standard_deviation
-% assumes that the dat is normaly distributed
-unbias_normal_std_est_subsamp=std_est_subsamp./normal_correction_c4(repeat_samp);
-ste_est_subsamp_normunbias=unbias_normal_std_est_subsamp./sqrt(repeat_samp);
+% assumes that the output is normaly distributed
+unbias_normal_std_est_subsamp=std_est_subsamp./repmat(normal_correction_c4(repeat_samp),[1,output_val_size]);
+ste_est_subsamp_normunbias=unbias_normal_std_est_subsamp./repmat(sqrt(repeat_samp),[1,output_val_size]);
 est_se_opp_norm_unbias=unbias_normal_std_est_subsamp.*mean_like_scaling_factor;
 
 %now we wish to give our best guess on what the standard error on the whole dataset will be
 % as a first guess we could take the mean across sampling fraction
-est_se_opp_mean_unweighted=nanmean(est_se_opp);
+est_se_opp_mean_unweighted=mean(est_se_opp,1,'omitnan');
 % and the asociated error
-est_std_opp_se_unweighted= std(est_se_opp);
-est_se_opp_se_unweighted=est_std_opp_se_unweighted./sqrt(numel(est_se_opp));
+est_std_opp_se_unweighted= std(est_se_opp,[],1);
+est_se_opp_se_unweighted=est_std_opp_se_unweighted./sqrt(size(est_se_opp,1));
 
 %% finding the standard devitation for the estimated standard deviation in the whole dataset
 % weighted SE(fun(data)),SE(SE(fun(data)))
@@ -240,16 +242,26 @@ est_se_opp_se_unweighted=est_std_opp_se_unweighted./sqrt(numel(est_se_opp));
 % see the mathematica notebook in the derivation folder
 % this results in an expected standard deviation in the sample estimated
 % standard deviation of sigma* Sqrt[1 - c4^2]
-se_samp_std_norm=unbias_normal_std_est_subsamp.*sqrt(1-normal_correction_c4(repeat_samp).^2);
+
+
+se_samp_std_norm=unbias_normal_std_est_subsamp.*repmat(sqrt(1-normal_correction_c4(repeat_samp).^2),[1,output_val_size]);
 std_se_opp_norm=se_samp_std_norm.*mean_like_scaling_factor;
 
-% lets now find the weighted values of the predicted SE values
-[est_se_opp_mean_weighted_norm,est_se_opp_se_weighted_norm]=unc_wmean(unbias_normal_std_est_subsamp,std_se_opp_norm);
+%TODO build argument to unc_wmean for dimension along which to operate so i dont have to have this ugly loop here
+est_se_opp_mean_weighted_norm=nan(output_val_size,1);
+est_se_opp_se_weighted_norm=nan(output_val_size,1);
+for ii=1:output_val_size
+    % lets now find the weighted values of the predicted SE values
+    [est_se_opp_mean_weighted_norm(ii),est_se_opp_se_weighted_norm(ii)]=...
+                    unc_wmean(unbias_normal_std_est_subsamp(:,ii),std_se_opp_norm(:,ii));
+end
 
+% Bryce finished vectorizing up to here will leave for kieran to finish/ merge changes
 
 % if we do not assume normality
 % we can use 4th centeral (unbiased) moment over the subsamples 
-var_samp_var_arb=(1./repeat_samp).*(unbias_moments_sub(:,3)-(std_est_subsamp.^4).*((repeat_samp-3)./(repeat_samp-1)));
+tmp
+var_samp_var_arb=(1./repeat_samp).*(unbias_moments_sub(:,3,:)-(std_est_subsamp.^4).*((repeat_samp-3)./(repeat_samp-1)));
 se_samp_std_arb=(1/2).*sqrt(var_samp_var_arb)./std_est_subsamp;
 std_se_opp_arb=se_samp_std_arb.*mean_like_scaling_factor;
 % this seems to do very well in my tests
