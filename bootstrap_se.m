@@ -123,6 +123,25 @@ else
     out_val_tmp=est_fun(data_smpl,opp_arguments{:});
 end 
 if ~isvector(out_val_tmp)
+    error('first output of function is not a scalar or vector')
+end
+out_val_tmp=col_vec(out_val_tmp);
+output_val_size=numel(out_val_tmp);
+%%
+%prealocate the moments of the distribution
+mean_sub=NaN(numel(sample_frac_vec),output_val_size);
+moments_sub=NaN(numel(sample_frac_vec),3,output_val_size);
+
+
+%% find the size of the scalar output by calling the estimation function once
+data_smpl=randsample(data,min_sample_num,do_replace);
+if est_fun_multi_out
+    [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
+    out_val_tmp=out_cell_tmp{1};
+else
+    out_val_tmp=est_fun(data_smpl,opp_arguments{:});
+end 
+if ~isvector(out_val_tmp)
     erro('first output of function is not a scalar or vector')
 end
 out_val_tmp=col_vec(out_val_tmp);
@@ -247,21 +266,16 @@ est_se_opp_se_unweighted=est_std_opp_se_unweighted./sqrt(size(est_se_opp,1));
 se_samp_std_norm=unbias_normal_std_est_subsamp.*repmat(sqrt(1-normal_correction_c4(repeat_samp).^2),[1,output_val_size]);
 std_se_opp_norm=se_samp_std_norm.*mean_like_scaling_factor;
 
-%TODO build argument to unc_wmean for dimension along which to operate so i dont have to have this ugly loop here
-est_se_opp_mean_weighted_norm=nan(output_val_size,1);
-est_se_opp_se_weighted_norm=nan(output_val_size,1);
-for ii=1:output_val_size
-    % lets now find the weighted values of the predicted SE values
-    [est_se_opp_mean_weighted_norm(ii),est_se_opp_se_weighted_norm(ii)]=...
-                    unc_wmean(unbias_normal_std_est_subsamp(:,ii),std_se_opp_norm(:,ii));
-end
-
-% Bryce finished vectorizing up to here will leave for kieran to finish/ merge changes
+% lets now find the weighted values of the predicted SE values
+[est_se_opp_mean_weighted_norm,est_se_opp_se_weighted_norm]=...
+    unc_wmean(unbias_normal_std_est_subsamp,std_se_opp_norm);
 
 % if we do not assume normality
 % we can use 4th centeral (unbiased) moment over the subsamples 
-tmp
-var_samp_var_arb=(1./repeat_samp).*(unbias_moments_sub(:,3,:)-(std_est_subsamp.^4).*((repeat_samp-3)./(repeat_samp-1)));
+unbias_moments_sub_3 = unbias_moments_sub(:,3,:);
+unbias_moments_sub_3=permute(unbias_moments_sub_3,[1,3,2]); % permute the dimensions to get the rid of the singleton dim
+var_samp_var_arb=(1./repeat_samp).*(unbias_moments_sub_3-(std_est_subsamp.^4).*((repeat_samp-3)./(repeat_samp-1)));
+
 se_samp_std_arb=(1/2).*sqrt(var_samp_var_arb)./std_est_subsamp;
 std_se_opp_arb=se_samp_std_arb.*mean_like_scaling_factor;
 % this seems to do very well in my tests
@@ -327,7 +341,7 @@ end
 
 
 %% try to fit the dependence of mean est fun (subset) so that we can estimate the bias with sample size
-if do_mean_fit && numel(sample_frac_vec)>1
+if do_mean_fit && numel(sample_frac_vec)>1 && size(unbias_samp_var,2)<2
     %TODO: a model that is asmyptotic to a value
     modelfun=@(b,x) b(1)+b(2).*x;
     weights=1./(out.sampling.ste.^2);
@@ -356,7 +370,7 @@ if do_mean_fit && numel(sample_frac_vec)>1
     end
 end
 
-if do_plots && numel(sample_frac_vec)>1
+if do_plots && numel(sample_frac_vec)>1 && size(unbias_samp_var,2)<2
     if isempty(p.Results.plot_fig_name) || isequal(p.Results.plot_fig_name,'')
         stfig('bootstrap results','add_stack',1);
     else
