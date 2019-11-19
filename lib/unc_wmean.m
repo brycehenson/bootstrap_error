@@ -21,7 +21,7 @@ else
     unc=unc(nan_mask,:);
 end
 
-if sum(nan_mask)~=0
+if sum(~nan_mask)~=0
     warning('%s: nan found in data will ignore these points\n',mfilename)
 end
 
