@@ -5,11 +5,11 @@ A matlab function that uses bootstrapping to find the standard error in an arbit
 
 It only takes a moderate amount of complexity in data analysis operation(estimation function) before it is difficult to determine the error in the result. Bootstraping/resampling is a powerfull statistical method that performs the analysis operation repeatedly on smaller subsets of the data in order to *estimate* the error in the result of the the operation(estimation function) on the full data set. Further the method is able to work with an analysis operation that only produces meaningfull results when performed with many data points (such as a (non)linear fit)
 
-The procedure is reasonably simple given some analysis operation (estimation function) A(x) (that produces a scalar) and a dataset D
-1. select a random sample of the data S of length n_samp (with replacements) out of all data collected (D, with length n_tot)
-2. compute the analysis operation A(S)
+The procedure is reasonably simple given some analysis operation (estimation function) **A(x)** (that produces a scalar) and a dataset **D**
+1. select a random sample of the data **S** of length **n_samp** (with replacements) out of all data collected (D, with length n_tot)
+2. compute the analysis operation **A(S)**
 3. repeat steps 1 to 2 many times saving the result of each analysis operation (on the subset)
-4. calulate the standard deviation across these results and multiply by sqrt(n_samp)/sqrt(n_tot) to estimate the standard error in A(D). (This is known as mean-like scaling.)
+4. calulate the standard deviation across these results and multiply by **sqrt(n_samp)/sqrt(n_tot)** to estimate the standard error in **A(D)**. (This is known as mean-like scaling.)
 
 
 
