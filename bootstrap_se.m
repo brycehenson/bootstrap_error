@@ -1,4 +1,4 @@
-function [out,detailed_data_out]=bootstrap_se(est_fun,data,varargin)
+function [out,detailed_data_out]=bootstrap_se(est_fun_in,data,varargin)
 %funciton calculates the standard error of performing est_fun(data)
 %data is a vector of cells or scalars
 
@@ -20,7 +20,7 @@ function [out,detailed_data_out]=bootstrap_se(est_fun,data,varargin)
 % '[matlab][bootstrap_error]' in the subject line for me to respond
 % Last revision:2019-06-02
 
-min_num=5; %minimum data size for resampling
+min_sample_num=5; %minimum data size for resampling
 
 p = inputParser;
 is_lims=@(x) (isequal(size(x),[1,2]) && (isnumeric(x) && x(2)<10 && x(1)>0))...
@@ -43,6 +43,7 @@ addOptional(p,'plot_fig_name','',@ischar);
 addOptional(p,'do_mean_fit',1,is_c_logical)
 addOptional(p,'use_weighting',true,is_c_logical)
 addOptional(p,'norm_weighting',false,is_c_logical)
+addOptional(p,'use_frac_size',false,is_c_logical)
 parse(p,varargin{:});
 
 do_mean_fit=p.Results.do_mean_fit;
@@ -51,6 +52,7 @@ do_replace=coerce_logical(p.Results.replace);
 use_mean_se_for_se_se=coerce_logical(p.Results.mean_se_for_se_se);
 use_weighting=coerce_logical(p.Results.use_weighting);
 norm_weighting=coerce_logical(p.Results.norm_weighting);
+use_frac=coerce_logical(p.Results.use_frac_size); %do we want to use the fractional method
 
 if use_mean_se_for_se_se
     warning('mean_se_for_se_se is depricated')
@@ -82,7 +84,7 @@ n_total=numel(data);
 sample_num_vec=floor(sample_frac_vec*n_total);
 sample_frac_vec=sample_num_vec/n_total;
 %cull anything below min_num
-mask=sample_num_vec>=min_num;
+mask=sample_num_vec>=min_sample_num;
 sample_num_vec=sample_num_vec(mask);
 sample_frac_vec=sample_frac_vec(mask);
 iimax=numel(sample_frac_vec);
@@ -96,35 +98,59 @@ if iimax==0
     error('no sample fracions')
 end
 
-%prealocate the moments of the distribution
-mean_sub=NaN(numel(sample_frac_vec),1);
-moments_sub=NaN(numel(sample_frac_vec),3);
-%find the output size of the passed estimator function
+
+%find the output size of the passed estimator function as in function [a,b,c]=function(inputs)
 %should build in optional argument to specify this
-output_size=nargout(est_fun);
+est_fun_output_size=nargout(est_fun_in);
 %this will only take the first output of an an anonymous function
-if output_size==-1
-    output_size=1;
+if est_fun_output_size==-1
+    est_fun_output_size=1;
 end
 
 out_cell=cell(iimax,repeat_samp_prefactor);
 in_cell=out_cell;
-out_cell_tmp=cell(1,output_size);
-if output_size>1 && save_multi_out
-    multi_out=true;
+out_cell_tmp=cell(1,est_fun_output_size);
+if est_fun_output_size>1 && save_multi_out
+    est_fun_multi_out=true;
 else
-    multi_out=false;
+    est_fun_multi_out=false;
 end
+
+if use_frac 
+    est_fun =  @(data,opts) est_fun_in(data,1,opts);
+else
+    est_fun =  est_fun_in;
+end
+
+%% find the size of the scalar output by calling the estimation function once
+data_smpl=randsample(data,min_sample_num,do_replace);
+if est_fun_multi_out
+    [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
+    out_val_tmp=out_cell_tmp{1};
+else
+    out_val_tmp=est_fun(data_smpl,opp_arguments{:});
+end 
+if ~isvector(out_val_tmp)
+    erro('first output of function is not a scalar or vector')
+end
+out_val_tmp=col_vec(out_val_tmp);
+output_val_size=numel(out_val_tmp);
+%%
+%prealocate the moments of the distribution
+mean_sub=NaN(numel(sample_frac_vec),output_val_size);
+moments_sub=NaN(numel(sample_frac_vec),3,output_val_size);
+
 
 if verbose>0
     fprintf('Bootstrapping with different sample fractions %04u:%04u',0)
 end
 for ii=1:iimax
     n_sample=sample_num_vec(ii);
+    frac_sample=sample_frac_vec(ii);
     %std means nothing for n<3
     %the finte sample correaction for the no replacements method breaks when n_sample=ntot
-    if n_sample>3 && (n_sample<n_total || do_replace)
-        est_fun_res_sub=NaN(repeat_samp(ii),1); %the results of the estimation function
+    if (n_sample>3 && (n_sample<n_total || do_replace)) || (use_frac && frac_sample<=1.0)
+        est_fun_res_sub=NaN(repeat_samp(ii),output_val_size); %the results of the estimation function
         if do_replace
             finite_pop_corr=1;
         else
@@ -132,31 +158,50 @@ for ii=1:iimax
         end 
         for jj=1:repeat_samp(ii)
             %calculate the analysis operation on the subset of dat
-            data_smpl=randsample(data,n_sample,do_replace);
+            if ~use_frac
+                data_smpl=randsample(data,n_sample,do_replace);
+            end
             %then we assign the output of the est_fun on the data_smp to est_fun_res_sub
             %matalb cant do [out_cell_tmp{:}]=scalar so a case statement
             %is needed
-            if multi_out
-                [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
-                est_fun_res_sub(jj)=out_cell_tmp{1};
+            if est_fun_multi_out
+                if use_frac
+                    [out_cell_tmp{:}]=est_fun(data_smpl,frac_sample,opp_arguments{:});
+                else
+                    [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
+                end
+                out_val_tmp=col_vec(out_cell_tmp{1});
+                if numel(out_val_tmp)~=output_val_size
+                    error('output size wrong')
+                end
+                est_fun_res_sub(jj,:)=out_val_tmp;
                 out_cell{ii,jj}=out_cell_tmp{2:end};
             else
-                est_fun_res_sub(jj)=est_fun(data_smpl,opp_arguments{:});
+                if use_frac
+                    out_val_tmp=est_fun(data_smpl,frac_sample,opp_arguments{:});
+                else
+                    out_val_tmp=est_fun(data_smpl,opp_arguments{:});
+                end
+                out_val_tmp=col_vec(out_val_tmp);
+                if numel(out_val_tmp)~=output_val_size
+                    error('output size wrong')
+                end
+                est_fun_res_sub(jj,:)=out_val_tmp;
             end 
             if save_input_data
                 in_cell{ii,jj}=data_smpl;
             end
         end
         % calculate statistics on the results with a given sample size
-        mean_sub(ii)=mean(est_fun_res_sub);
+        mean_sub(ii,:)=mean(est_fun_res_sub,1);
         % biased sample variance of the subset
-        moments_sub(ii,1)=moment(est_fun_res_sub,2);
-        moments_sub(ii,2)=moment(est_fun_res_sub,3);
-        moments_sub(ii,3)=moment(est_fun_res_sub,4);
+        moments_sub(ii,1,:)=moment(est_fun_res_sub,2,1);
+        moments_sub(ii,2,:)=moment(est_fun_res_sub,3,1);
+        moments_sub(ii,3,:)=moment(est_fun_res_sub,4,1);
 
         %use finte population correction to estimate the population std using sampling without
         %replacements, if do_replace finite_pop_corr=1
-        moments_sub(ii,1)=moments_sub(ii,1)/finite_pop_corr;
+        moments_sub(ii,1,:)=moments_sub(ii,1,:)/finite_pop_corr;
     end
     if verbose>0, fprintf('\b\b\b\b%04u',ii), end
 end
@@ -167,32 +212,34 @@ out=[];
 unbias_factor=(repeat_samp./(repeat_samp-1));
 unbias_moments_sub= moments_sub.*repmat(unbias_factor,1,size(moments_sub,2));
 %unbiased sample variance for the results of each bootstrap of a given size:
-unbias_samp_var=unbias_moments_sub(:,1);
+unbias_samp_var=unbias_moments_sub(:,1,:);
+unbias_samp_var=permute(unbias_samp_var,[1,3,2]); % permute the dimensions to get the rid of the singleton dim
 % biased sample standard deviation
 std_est_subsamp=sqrt(unbias_samp_var); 
 
-% baised sample standard error for each bootstrap size
-ste_est_subsamp=std_est_subsamp./sqrt(repeat_samp);
+% baised sample standard error for each bootstrap size size()=[numel(sample_frac_vec), output_val_size]
+ste_est_subsamp=std_est_subsamp./repmat(sqrt(repeat_samp),[1,output_val_size]);
 
-%now calulate the standard error in the anal
+%now calulate the standard error in the anal.
 %operation on the whole datset assuming mean like scaling
 % if this is flat with sample size then the estimator is mean-like (which is good)
 mean_like_scaling_factor=sqrt(sample_num_vec)./sqrt(n_total);
+mean_like_scaling_factor=repmat(mean_like_scaling_factor,[1,output_val_size]);
 est_se_opp=std_est_subsamp.*mean_like_scaling_factor;
 
 %% unbiasing normaly distributed data
 % correct for the bias of the std https://en.wikipedia.org/wiki/Unbiased_estimation_of_standard_deviation
-% assumes that the dat is normaly distributed
-unbias_normal_std_est_subsamp=std_est_subsamp./normal_correction_c4(repeat_samp);
-ste_est_subsamp_normunbias=unbias_normal_std_est_subsamp./sqrt(repeat_samp);
+% assumes that the output is normaly distributed
+unbias_normal_std_est_subsamp=std_est_subsamp./repmat(normal_correction_c4(repeat_samp),[1,output_val_size]);
+ste_est_subsamp_normunbias=unbias_normal_std_est_subsamp./repmat(sqrt(repeat_samp),[1,output_val_size]);
 est_se_opp_norm_unbias=unbias_normal_std_est_subsamp.*mean_like_scaling_factor;
 
 %now we wish to give our best guess on what the standard error on the whole dataset will be
 % as a first guess we could take the mean across sampling fraction
-est_se_opp_mean_unweighted=nanmean(est_se_opp);
+est_se_opp_mean_unweighted=mean(est_se_opp,1,'omitnan');
 % and the asociated error
-est_std_opp_se_unweighted= std(est_se_opp);
-est_se_opp_se_unweighted=est_std_opp_se_unweighted./sqrt(numel(est_se_opp));
+est_std_opp_se_unweighted= std(est_se_opp,[],1);
+est_se_opp_se_unweighted=est_std_opp_se_unweighted./sqrt(size(est_se_opp,1));
 
 %% finding the standard devitation for the estimated standard deviation in the whole dataset
 % weighted SE(fun(data)),SE(SE(fun(data)))
@@ -214,16 +261,21 @@ est_se_opp_se_unweighted=est_std_opp_se_unweighted./sqrt(numel(est_se_opp));
 % see the mathematica notebook in the derivation folder
 % this results in an expected standard deviation in the sample estimated
 % standard deviation of sigma* Sqrt[1 - c4^2]
-se_samp_std_norm=unbias_normal_std_est_subsamp.*sqrt(1-normal_correction_c4(repeat_samp).^2);
+
+
+se_samp_std_norm=unbias_normal_std_est_subsamp.*repmat(sqrt(1-normal_correction_c4(repeat_samp).^2),[1,output_val_size]);
 std_se_opp_norm=se_samp_std_norm.*mean_like_scaling_factor;
 
 % lets now find the weighted values of the predicted SE values
-[est_se_opp_mean_weighted_norm,est_se_opp_se_weighted_norm]=unc_wmean(unbias_normal_std_est_subsamp,std_se_opp_norm);
-
+[est_se_opp_mean_weighted_norm,est_se_opp_se_weighted_norm]=...
+    unc_wmean(unbias_normal_std_est_subsamp,std_se_opp_norm);
 
 % if we do not assume normality
 % we can use 4th centeral (unbiased) moment over the subsamples 
-var_samp_var_arb=(1./repeat_samp).*(unbias_moments_sub(:,3)-(std_est_subsamp.^4).*((repeat_samp-3)./(repeat_samp-1)));
+unbias_moments_sub_3 = unbias_moments_sub(:,3,:);
+unbias_moments_sub_3=permute(unbias_moments_sub_3,[1,3,2]); % permute the dimensions to get the rid of the singleton dim
+var_samp_var_arb=(1./repeat_samp).*(unbias_moments_sub_3-(std_est_subsamp.^4).*((repeat_samp-3)./(repeat_samp-1)));
+
 se_samp_std_arb=(1/2).*sqrt(var_samp_var_arb)./std_est_subsamp;
 std_se_opp_arb=se_samp_std_arb.*mean_like_scaling_factor;
 % this seems to do very well in my tests
@@ -289,7 +341,7 @@ end
 
 
 %% try to fit the dependence of mean est fun (subset) so that we can estimate the bias with sample size
-if do_mean_fit && numel(sample_frac_vec)>1
+if do_mean_fit && numel(sample_frac_vec)>1 && size(unbias_samp_var,2)<2
     %TODO: a model that is asmyptotic to a value
     modelfun=@(b,x) b(1)+b(2).*x;
     weights=1./(out.sampling.ste.^2);
@@ -318,7 +370,7 @@ if do_mean_fit && numel(sample_frac_vec)>1
     end
 end
 
-if do_plots && numel(sample_frac_vec)>1
+if do_plots && numel(sample_frac_vec)>1 && size(unbias_samp_var,2)<2
     if isempty(p.Results.plot_fig_name) || isequal(p.Results.plot_fig_name,'')
         stfig('bootstrap results','add_stack',1);
     else
