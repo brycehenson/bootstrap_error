@@ -1,5 +1,5 @@
 # bootstrap_error
-***Bryce M. Henson, [Dong K. Shin](https://github.com/spicydonkey)***   
+***Bryce M. Henson, [Dong K. Shin](https://github.com/spicydonkey),[Kieran F. Thomas](https://github.com/KF-Thomas)***   
 A matlab function that uses bootstrapping to find the standard error in an arbitrary analysis operation.
 **Status:** This core functionality proviced here  **is ready for use in other projects**. Testing is implemented and passing for the core functonality which provides error determination.
 
