@@ -1,11 +1,9 @@
-# bootstrap_error
+# Bootstrap Error
 ***Bryce M. Henson, [Dong K. Shin](https://github.com/spicydonkey), [Kieran F. Thomas](https://github.com/KF-Thomas)***   
 A matlab function that uses bootstrapping to find the standard error in an arbitrary analysis operation.
 **Status:** This core functionality proviced here  **is ready for use in other projects**. Testing is implemented and passing for the core functonality which provides error determination.
 
-It only takes a moderate amount of complexity in data analysis operation(estimation function) before it is difficult to determine the error in the result. Bootstraping/resampling is a powerfull statistical method that performs the analysis operation repeatedly on smaller subsets of the data in order to *estimate* the error in the final result (using all the data). Further the method is able to work with an analysis operation that only produces meaningfull results when performed with many data points (such as a linear fit)
-
-
+It only takes a moderate amount of complexity in data analysis operation(estimation function) before it is difficult to determine the error in the result. Bootstraping/resampling is a powerfull statistical method that performs the analysis operation repeatedly on smaller subsets of the data in order to *estimate* the error in the result of the the operation(estimation function) on the full data set. Further the method is able to work with an analysis operation that only produces meaningfull results when performed with many data points (such as a (non)linear fit)
 
 The procedure is reasonably simple given some analysis operation (estimation function) A(x) (that produces a scalar) and a dataset D
 1. select a random sample of the data S of length n_samp (with replacements) out of all data collected (D, with length n_tot)
@@ -15,9 +13,9 @@ The procedure is reasonably simple given some analysis operation (estimation fun
 
 
 
-As a test it is advisable to check that there is no trend in the estimated standard error as function of the size of the subset. Thus the above procedure may be repeated at many different fractions of the whole dataset giving the graph below. 
+As a test it is advisable to check that there is no trend in either: the output of the function, or the estimated standard error, as function of the size of the subset. Thus the above procedure may be repeated at many different fractions of the whole dataset giving the graph below. 
 ![fig1](/fig1.png)
-This graph can be used to reveal the bias of the estimation function with sample size and how the error in the result scales with sample size. An estimation function is mean-like if the estimated SE in the operation on the whole data set does not change with subsample fraction.
+This graph can be used to reveal the bias of the estimation function with sample size and how the error in the result scales with sample size. An estimation function is mean-like if the output value and the estimated SE in the operation on the whole data set does not change with subsample fraction.
 
 
 ## Features
