@@ -28,6 +28,7 @@ is_lims=@(x) (isequal(size(x),[1,2]) && (isnumeric(x) && x(2)<10 && x(1)>0))...
 is_c_logical=@(in) isequal(in,true) || isequal(in,false); %can x be cast as a logical
 addOptional(p,'replace',true,is_c_logical);
 addOptional(p,'num_samp_frac',10,@(x) isnumeric(x) & x>=1);
+addOptional(p,'samp_frac_log',false,is_c_logical)
 addOptional(p,'num_samp_rep',10,@(x) isnumeric(x) & x>=1);
 addOptional(p,'samp_frac_lims',0.1,is_lims);
 addOptional(p,'plots',false,is_c_logical);
@@ -70,10 +71,13 @@ if p.Results.num_samp_frac==1
      sample_frac_vec=mean(p.Results.samp_frac_lims);
     %sample over multiple fractions
 elseif size(p.Results.samp_frac_lims,2)==2 
-    sample_frac_vec=linspace(p.Results.samp_frac_lims(1),...
-    p.Results.samp_frac_lims(2),p.Results.num_samp_frac)';
-%if the lims are a scalar then just do one fraction
-
+    if ~p.Results.samp_frac_log
+        sample_frac_vec=linspace(p.Results.samp_frac_lims(1),...
+            p.Results.samp_frac_lims(2),p.Results.num_samp_frac)';
+    else
+        sample_frac_vec=logspace(log10(p.Results.samp_frac_lims(1)),...
+            log10(p.Results.samp_frac_lims(2)),p.Results.num_samp_frac)';
+    end
 end
 %overwrite plots if only samplign at one fraction of the data
 %if size(sample_frac_vec,1)==1
@@ -343,15 +347,17 @@ end
 %% try to fit the dependence of mean est fun (subset) so that we can estimate the bias with sample size
 if do_mean_fit && numel(sample_frac_vec)>1 && size(unbias_samp_var,2)<2
     %TODO: a model that is asmyptotic to a value
-    modelfun=@(b,x) b(1)+b(2).*x;
+    %%modelfun=@(b,x) b(1)+b(2).*x;
+    %cof_names={'offset','grad'};
+    modelfun=@(b,x) b(1)-b(2).*x.^-1-b(3).*x.^-2;
     weights=1./(out.sampling.ste.^2);
     not_nan_mask=~isnan(out.sampling.sample_size) & ~isnan(out.sampling.mean) & ~isnan(weights);
     predictor=out.sampling.sample_size(not_nan_mask);
     response=out.sampling.mean(not_nan_mask);
     weights=weights(not_nan_mask);
     weights=weights./nansum(weights);
-    beta0=[nanmean(response),0];
-    cof_names={'offset','grad'};
+    beta0=[nanmean(response),0,0];
+    cof_names={'offset','x-1','x-2'};
     opt = statset('TolFun',1e-10,'TolX',1e-10,...
             'MaxIter',1e4,... %1e4
             'UseParallel',1);
@@ -361,13 +367,17 @@ if do_mean_fit && numel(sample_frac_vec)>1 && size(unbias_samp_var,2)<2
     out.est_mean_dep_fit=fitobject;
     %%itparam=fitobject.Coefficients;
     %osc_fit.model_coefs(ii,:,:)=[fitparam.Estimate,fitparam.SE];
-    sigma_threshold=3;%number of standard deviations away from zero to be signfigant
-    is_grad_sig=abs(fitobject.Coefficients.Estimate(2))>fitobject.Coefficients.SE(2)*sigma_threshold;
-    if is_grad_sig && verbose>0
-        warning(['%s: fit to mean result of est fun on data subset \n'...
-                'shows that the gradient with data size is not within %.0f sd of zero \n',...
-                'you may have a biased estimator\n'],mfilename,sigma_threshold)
-    end
+    % error message for linear model
+%     sigma_threshold=3;%number of standard deviations away from zero to be signfigant
+%     is_grad_sig=abs(fitobject.Coefficients.Estimate(2))>fitobject.Coefficients.SE(2)*sigma_threshold;
+%     if is_grad_sig && verbose>0
+%         warning(['%s: fit to mean result of est fun on data subset \n'...
+%                 'shows that the gradient with data size is not within %.0f sd of zero \n',...
+%                 'you may have a biased estimator\n'],mfilename,sigma_threshold)
+%     end
+    %
+    out.results.mean_dep_err_at_data_size=predict(fitobject,n_total)-predict(fitobject,inf);
+    
 end
 
 if do_plots && numel(sample_frac_vec)>1 && size(unbias_samp_var,2)<2
@@ -473,6 +483,7 @@ if do_plots && numel(sample_frac_vec)>1 && size(unbias_samp_var,2)<2
         chi=get(gca, 'Children');
         set(gca, 'Children',flipud(chi))
         legends=[legends,'total data size'];
+        legends=fliplr(legends);
     end
     hold off
     drawnow
