@@ -1,4 +1,5 @@
 
+
 data=rand([1e3,1]);
 anal_opp=@(x) mean(x);
 real_samp_se=std(data,1)/sqrt(numel(data));
@@ -178,16 +179,15 @@ boot=bootstrap_se(anal_opp,data,...
 %compare the error in the SE found using the moments to that computed using the spread in data 
 (boot.results.se_fun_whole_unweighted-boot.results.se_fun_whole_weighted_arb)/boot.results.se_fun_whole_weighted_arb
 
-%%
+%% use cells as input formats
 
 data=num2cell(rand([1e2,2]),2);
 d_flat=cell2mat(data);
 d_flat=d_flat(:,1);
 real_samp_se=std(d_flat,1)/sqrt(numel(d_flat));
 real_dist_ste=sqrt((1/12))/sqrt(numel(d_flat));
-%unifrm distributions give an oversetimated error in the SE
 
-fignum=10;
+
 boot=bootstrap_se(@first_elm_avg,data,...
     'plots',true,...
     'replace',true,...
