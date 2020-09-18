@@ -67,7 +67,7 @@ repeat_samp_prefactor=p.Results.num_samp_rep;
 
 %if the number of fractions to sample is one take the mean of the limits
 if p.Results.num_samp_frac==1
-     sample_frac_vec=mean(p.Results.samp_frac_lims);
+     sample_frac_vec=nanmean(p.Results.samp_frac_lims);
     %sample over multiple fractions
 elseif size(p.Results.samp_frac_lims,2)==2 
     sample_frac_vec=linspace(p.Results.samp_frac_lims(1),...
@@ -123,7 +123,11 @@ else
 end
 
 %% find the size of the scalar output by calling the estimation function once
-data_smpl=randsample(data,min_sample_num,do_replace);
+if use_frac
+    data_smpl=data;
+else
+    data_smpl=randsample(data,min_sample_num,do_replace);
+end
 if est_fun_multi_out
     [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
     out_val_tmp=out_cell_tmp{1};
@@ -155,7 +159,10 @@ for ii=1:iimax
             finite_pop_corr=1;
         else
             finite_pop_corr=(n_total-n_sample)/(n_total-1);
-        end 
+        end
+        if use_frac
+            finite_pop_corr = 1 - frac_sample; %approximate
+        end
         for jj=1:repeat_samp(ii)
             %calculate the analysis operation on the subset of dat
             if ~use_frac
@@ -166,9 +173,9 @@ for ii=1:iimax
             %is needed
             if est_fun_multi_out
                 if use_frac
-                    [out_cell_tmp{:}]=est_fun(data_smpl,frac_sample,opp_arguments{:});
+                    [out_cell_tmp{:}]=est_fun_in(data,frac_sample,opp_arguments{:});
                 else
-                    [out_cell_tmp{:}]=est_fun(data_smpl,opp_arguments{:});
+                    [out_cell_tmp{:}]=est_fun_in(data_smpl,opp_arguments{:});
                 end
                 out_val_tmp=col_vec(out_cell_tmp{1});
                 if numel(out_val_tmp)~=output_val_size
@@ -178,9 +185,9 @@ for ii=1:iimax
                 out_cell{ii,jj}=out_cell_tmp{2:end};
             else
                 if use_frac
-                    out_val_tmp=est_fun(data_smpl,frac_sample,opp_arguments{:});
+                    out_val_tmp=est_fun_in(data,frac_sample,opp_arguments{:});
                 else
-                    out_val_tmp=est_fun(data_smpl,opp_arguments{:});
+                    out_val_tmp=est_fun_in(data_smpl,opp_arguments{:});
                 end
                 out_val_tmp=col_vec(out_val_tmp);
                 if numel(out_val_tmp)~=output_val_size
@@ -188,16 +195,17 @@ for ii=1:iimax
                 end
                 est_fun_res_sub(jj,:)=out_val_tmp;
             end 
-            if save_input_data
+            if save_input_data && ~use_frac
                 in_cell{ii,jj}=data_smpl;
             end
         end
         % calculate statistics on the results with a given sample size
-        mean_sub(ii,:)=mean(est_fun_res_sub,1);
+        mean_sub(ii,:)=nanmean(est_fun_res_sub,1);
         % biased sample variance of the subset
-        moments_sub(ii,1,:)=moment(est_fun_res_sub,2,1);
-        moments_sub(ii,2,:)=moment(est_fun_res_sub,3,1);
-        moments_sub(ii,3,:)=moment(est_fun_res_sub,4,1);
+%         nan_mask = ~isnan(est_fun_res_sub);
+        moments_sub(ii,1,:)=nanmoment(est_fun_res_sub,2,1);
+        moments_sub(ii,2,:)=nanmoment(est_fun_res_sub,3,1);
+        moments_sub(ii,3,:)=nanmoment(est_fun_res_sub,4,1);
 
         %use finte population correction to estimate the population std using sampling without
         %replacements, if do_replace finite_pop_corr=1

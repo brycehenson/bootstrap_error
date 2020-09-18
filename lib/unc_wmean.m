@@ -5,6 +5,8 @@ function [mean_val,ste_mean]=unc_wmean(x,unc)
 % -docs, tests
 % - cleaner layout
 
+%moving handeling of nan's to sewm
+
 % x=col_vec(x);
 % unc=col_vec(unc);
 if numel(unc)~=1 && numel(x)~=numel(unc)
@@ -14,12 +16,12 @@ end
 if numel(unc)==1
     nan_mask=isnan(x);
     nan_mask=all(~nan_mask,2);
-    x=x(~nan_mask);
+    x=x;%(nan_mask);
 else
     nan_mask=isnan(x) | isnan(unc);
     nan_mask=all(~nan_mask,2);
-    x=x(nan_mask,:);
-    unc=unc(nan_mask,:);
+    x=x;%(nan_mask,:);
+    unc=unc;%(nan_mask,:);
 end
 
 if sum(~nan_mask)~=0
