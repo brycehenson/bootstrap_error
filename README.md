@@ -1,8 +1,8 @@
 
 ***[Bryce M. Henson](https://github.com/brycehenson), [Dong K. Shin](https://github.com/spicydonkey), [Kieran F. Thomas](https://github.com/KF-Thomas)***   
 
-**[![Build Status](https://img.shields.io/static/v1.svg?label=CSL&message=software%20against%20climate%20change&color=green?style=flat&logo=github)](https://img.shields.io/static/v1.svg?label=CSL&message=software%20against%20climate%20change&color=green?style=flat&logo=github)
-**
+[![Build Status](https://img.shields.io/static/v1.svg?label=CSL&message=software%20against%20climate%20change&color=green?style=flat&logo=github)](https://img.shields.io/static/v1.svg?label=CSL&message=software%20against%20climate%20change&color=green?style=flat&logo=github)
+
 
 A matlab function that uses bootstrapping to find the standard error in an arbitrary analysis operation.
 **Status:** This core functionality provided here  **is ready for use in other projects**. Testing is implemented and passing for the core functionality which provides error determination.
